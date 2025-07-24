@@ -19,6 +19,7 @@
     <option value="github">GitHub</option>
   </select>
   <button onclick="loadCVs()">Load CVs</button>
+  <button onclick="reviewAllCVs()" style="margin-left:1em;">Review & Rank All CVs</button>
 
   <div style="margin-bottom:1em;">
     <label for="jobDescription"><b>Job Description:</b></label><br>
@@ -28,6 +29,7 @@
   <div class="cv-list" id="cvList"></div>
   <div class="review-box" id="reviewBox" style="display:none;"></div>
   <div class="preview-box" id="previewBox" style="display:none; margin-top:2em; border:1px solid #aaa; padding:1em; border-radius:5px; background:#f9f9f9;"></div>
+  <div id="allReviewsBox" style="display:none; margin-top:2em;"></div>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <script>
@@ -69,6 +71,29 @@
       const res = await fetch(`http://localhost:8000/cv_content?source=${cv.source}&path=${encodeURIComponent(cv.path)}`);
       const text = await res.text();
       document.getElementById('previewBox').innerHTML = `<h3>Preview: ${cv.name}</h3><pre style='white-space:pre-wrap; max-height:300px; overflow:auto;'>${text}</pre>`;
+    }
+
+    async function reviewAllCVs() {
+      const source = document.getElementById('source').value;
+      const jobDescription = document.getElementById('jobDescription').value;
+      document.getElementById('allReviewsBox').style.display = 'block';
+      document.getElementById('allReviewsBox').innerHTML = 'Reviewing all CVs...';
+      const res = await fetch(`http://localhost:8000/review_all?source=${source}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jobDescription ? JSON.stringify(jobDescription) : null
+      });
+      const results = await res.json();
+      if (!Array.isArray(results) || results.length === 0) {
+        document.getElementById('allReviewsBox').innerHTML = 'No reviews found.';
+        return;
+      }
+      let html = `<h2>All CVs Ranked by Fit Score</h2><table border='1' cellpadding='6' style='border-collapse:collapse;'><tr><th>Rank</th><th>CV Name</th><th>Fit Score</th><th>Review</th></tr>`;
+      results.forEach((r, i) => {
+        html += `<tr><td>${i+1}</td><td>${r.cv_name}</td><td style='text-align:center;'>${r.fit_score}</td><td>${marked.parse(r.review)}</td></tr>`;
+      });
+      html += '</table>';
+      document.getElementById('allReviewsBox').innerHTML = html;
     }
   </script>
 </body>

@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Body
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +9,7 @@ from github import Github
 from fastapi.responses import PlainTextResponse
 import base64
 from crewai import Crew, Agent, Task
+import re
 
 app = FastAPI()
 
@@ -31,6 +32,11 @@ class CVInfo(BaseModel):
 class ReviewResult(BaseModel):
     cv_name: str
     review: str
+
+class ReviewAllResult(BaseModel):
+    cv_name: str
+    review: str
+    fit_score: int
 
 def list_gdrive_cvs():
     creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
@@ -131,11 +137,15 @@ def run_gemini_review(cv_text, cv_name, job_description=None):
     description = f"Review the following CV named {cv_name} for skills, experience, and formatting."
     if job_description:
         description += f"\n\nMatch the CV to the following job description and provide feedback on fit:\n{job_description}"
-    description += f"\n\nCV Content:\n{cv_text}"
+    # Ask for a numeric fit score in the output
+    description += ("\n\nCV Content:\n" + cv_text +
+        "\n\nIn your response, provide a numeric fit score (0-100) for how well this CV matches the job description, "
+        "and then provide a structured, actionable review. Format your response as follows:\n"
+        "Fit Score: <number>\nReview: <your review text>")
     task = Task(
         description=description,
         agent=agent,
-        expected_output="A structured, actionable review of the CV, including feedback on skills, experience, formatting, and fit for the job description if provided."
+        expected_output="A structured, actionable review of the CV, including feedback on skills, experience, formatting, and fit for the job description if provided. Include a numeric fit score (0-100) at the top of your response."
     )
     crew = Crew(
         agents=[agent],
@@ -166,6 +176,30 @@ def review_cv(cv: CVInfo):
     if hasattr(review, "raw"):
         review = review.raw
     return ReviewResult(cv_name=cv.name, review=review)
+
+@app.post("/review_all", response_model=List[ReviewAllResult])
+def review_all_cvs(
+    source: str = Query(..., regex="^(gdrive|github)$"),
+    job_description: Optional[str] = Body(None)
+):
+    # List all CVs
+    if source == 'gdrive':
+        cvs = list_gdrive_cvs()
+    else:
+        cvs = list_github_cvs()
+    results = []
+    for cv in cvs:
+        cv_text = get_gdrive_cv_content(cv.path) if cv.source == 'gdrive' else get_github_cv_content(cv.path)
+        review = run_gemini_review(cv_text, cv.name, job_description)
+        if hasattr(review, "raw"):
+            review = review.raw
+        # Extract fit score from the review (expecting 'Fit Score: <number>')
+        match = re.search(r"Fit Score:\s*(\d+)", review)
+        fit_score = int(match.group(1)) if match else 0
+        results.append(ReviewAllResult(cv_name=cv.name, review=review, fit_score=fit_score))
+    # Sort by fit_score descending
+    results.sort(key=lambda x: x.fit_score, reverse=True)
+    return results
 
 @app.get("/cv_content", response_class=PlainTextResponse)
 def get_cv_content(source: str, path: str):
