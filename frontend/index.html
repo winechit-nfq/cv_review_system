@@ -4,38 +4,172 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CV Review System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; margin: 2em; }
+    body { font-family: 'Inter', Arial, sans-serif; margin: 0; background: #f4f6fa; }
+    .header-bar {
+      background: #1976d2;
+      color: #fff;
+      padding: 1.2em 2em 1.2em 1.2em;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .header-bar .logo {
+      width: 38px; height: 38px; margin-right: 1em; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5em; color: #1976d2; font-weight: bold; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .header-bar .app-title { font-size: 1.5em; font-weight: 600; letter-spacing: 1px; }
+    .main-content { max-width: 900px; margin: 2.5em auto 2em auto; padding: 0 1em; }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      padding: 2em 2em 1.5em 2em;
+      margin-bottom: 2em;
+    }
     .cv-list { margin-top: 1em; }
-    .review-box { margin-top: 2em; border: 1px solid #ccc; padding: 1em; border-radius: 5px; }
-    button { margin-left: 1em; }
+    .review-box { margin-top: 2em; border: 1px solid #ccc; padding: 1em; border-radius: 5px; background: #fff; }
+    button {
+      margin-left: 1em;
+      background: #1976d2;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.5em 1.2em;
+      font-size: 1em;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+      box-shadow: 0 1px 4px rgba(25, 118, 210, 0.08);
+    }
+    button:hover { background: #1565c0; box-shadow: 0 2px 8px rgba(25, 118, 210, 0.12); }
+    table.cv-table {
+      width: 100%;
+      max-width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      border-radius: 8px;
+      overflow: hidden;
+      table-layout: auto;
+    }
+    .cv-table th, .cv-table td {
+      padding: 0.75em 1em;
+      text-align: left;
+      vertical-align: top;
+    }
+    .cv-table th {
+      background: #e3eaf6;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      font-weight: 600;
+      font-size: 1.05em;
+      border-bottom: 2px solid #b6c6e3;
+    }
+    .cv-table tr:nth-child(even) { background: #f7fafd; }
+    .cv-table tr:nth-child(odd) { background: #fff; }
+    .cv-table td {
+      border-bottom: 1px solid #e3eaf6;
+      font-size: 0.98em;
+    }
+    .cv-table th[title], .cv-table td[title] {
+      cursor: help;
+      border-bottom: 1px dotted #888;
+    }
+    .cv-table tr:hover { background: #e3eaf6; transition: background 0.2s; }
+    .table-scroll {
+      overflow-x: auto;
+      margin-top: 1em;
+      border-radius: 8px;
+    }
+    @media (max-width: 900px) {
+      .cv-table th, .cv-table td { padding: 0.5em 0.5em; font-size: 0.95em; }
+      .review-box, .preview-box { font-size: 0.97em; }
+      .main-content { padding: 0 0.2em; }
+      .card { padding: 1.2em 0.7em 1em 0.7em; }
+    }
+    @media (max-width: 600px) {
+      .cv-table th, .cv-table td { padding: 0.4em 0.2em; font-size: 0.92em; }
+      .review-box, .preview-box { font-size: 0.93em; }
+      .main-content { padding: 0; }
+      .card { padding: 0.7em 0.2em 0.7em 0.2em; }
+    }
+    .summary-box {
+      margin-top: 2em;
+      margin-bottom: 0.5em;
+      background: linear-gradient(90deg, #e3eaf6 60%, #c5d6f6 100%);
+      padding: 1.1em 1.7em;
+      border-radius: 10px;
+      font-size: 1.12em;
+      color: #1a237e;
+      box-shadow: 0 2px 8px rgba(25, 118, 210, 0.07);
+      display: inline-block;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+    }
+    .loading-spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 4px solid #e3eaf6;
+      border-top: 4px solid #1976d2;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 1.5em auto 1.5em auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    footer {
+      margin-top: 3em;
+      padding: 1.5em 0 1em 0;
+      text-align: center;
+      color: #888;
+      font-size: 0.98em;
+      background: #e3eaf6;
+      border-top: 1px solid #b6c6e3;
+    }
   </style>
 </head>
 <body>
-  <h1>CV Review System</h1>
-  <label for="source">Select Source:</label>
-  <select id="source">
-    <option value="gdrive">Google Drive</option>
-    <option value="github">GitHub</option>
-  </select>
-  <button onclick="loadCVs()">Load CVs</button>
-  <button onclick="reviewAllCVs()" style="margin-left:1em;">Review & Rank All CVs</button>
-
-  <div style="margin-bottom:1em;">
-    <label for="jobDescription"><b>Job Description:</b></label><br>
-    <textarea id="jobDescription" rows="6" style="width:100%;max-width:700px;" placeholder="Paste the job description here..."></textarea>
+  <div class="header-bar">
+    <div class="logo" title="CV Review System">CV</div>
+    <div class="app-title">CV Review System</div>
   </div>
+  <div class="main-content">
+    <div class="card">
+      <label for="source">Select Source:</label>
+      <select id="source">
+        <option value="gdrive">Google Drive</option>
+        <option value="github">GitHub</option>
+      </select>
+      <button onclick="loadCVs()">Load CVs</button>
+      <button id="reviewAllBtn" onclick="reviewAllCVs()" style="margin-left:1em;">Review & Rank All CVs</button>
+      <button id="stopReviewAllBtn" onclick="stopReviewAllCVs()" style="margin-left:1em; display:none; background:#c62828;">Stop Review All</button>
 
-  <div class="cv-list" id="cvList"></div>
-  <div class="review-box" id="reviewBox" style="display:none;"></div>
-  <div class="preview-box" id="previewBox" style="display:none; margin-top:2em; border:1px solid #aaa; padding:1em; border-radius:5px; background:#f9f9f9;"></div>
-  <div id="allReviewsBox" style="display:none; margin-top:2em;"></div>
+      <div style="margin-bottom:1em; margin-top:1.5em;">
+        <label for="jobDescription"><b>Job Description:</b></label><br>
+        <textarea id="jobDescription" rows="6" style="width:100%;max-width:700px;" placeholder="Paste the job description here..."></textarea>
+      </div>
+    </div>
+    <div class="cv-list" id="cvList"></div>
+    <div class="review-box" id="reviewBox" style="display:none;"></div>
+    <div class="preview-box" id="previewBox" style="display:none; margin-top:2em; border:1px solid #aaa; padding:1em; border-radius:5px; background:#f9f9f9;"></div>
+    <div id="allReviewsBox" style="display:none; margin-top:2em;"></div>
+  </div>
+  <footer>
+    &copy; 2024 CV Review System. All rights reserved.
+  </footer>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <script>
     async function loadCVs() {
       const source = document.getElementById('source').value;
       document.getElementById('cvList').innerHTML = 'Loading...';
+      document.getElementById('allReviewsBox').style.display = 'none';
+      document.getElementById('reviewBox').style.display = 'none';
+      document.getElementById('previewBox').style.display = 'none';
       const res = await fetch(`http://localhost:8000/cvs?source=${source}`);
       const cvs = await res.json();
       let html = '<ul>';
@@ -44,14 +178,12 @@
       });
       html += '</ul>';
       document.getElementById('cvList').innerHTML = html;
-      document.getElementById('reviewBox').style.display = 'none';
-      document.getElementById('previewBox').style.display = 'none';
     }
 
     async function reviewCV(cv) {
       const jobDescription = document.getElementById('jobDescription').value;
       document.getElementById('reviewBox').style.display = 'block';
-      document.getElementById('reviewBox').innerHTML = 'Reviewing...';
+      document.getElementById('reviewBox').innerHTML = '<div class="loading-spinner"></div>';
       const res = await fetch('http://localhost:8000/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,33 +199,74 @@
 
     async function previewCV(cv) {
       document.getElementById('previewBox').style.display = 'block';
-      document.getElementById('previewBox').innerHTML = 'Loading preview...';
+      document.getElementById('previewBox').innerHTML = '<div class="loading-spinner"></div>';
       const res = await fetch(`http://localhost:8000/cv_content?source=${cv.source}&path=${encodeURIComponent(cv.path)}`);
       const text = await res.text();
       document.getElementById('previewBox').innerHTML = `<h3>Preview: ${cv.name}</h3><pre style='white-space:pre-wrap; max-height:300px; overflow:auto;'>${text}</pre>`;
     }
 
+    let reviewAllAbortController = null;
     async function reviewAllCVs() {
       const source = document.getElementById('source').value;
       const jobDescription = document.getElementById('jobDescription').value;
       document.getElementById('allReviewsBox').style.display = 'block';
-      document.getElementById('allReviewsBox').innerHTML = 'Reviewing all CVs...';
-      const res = await fetch(`http://localhost:8000/review_all?source=${source}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: jobDescription ? JSON.stringify(jobDescription) : null
-      });
-      const results = await res.json();
+      document.getElementById('allReviewsBox').innerHTML = '<div class="loading-spinner"></div>';
+      document.getElementById('reviewAllBtn').disabled = true;
+      document.getElementById('stopReviewAllBtn').style.display = '';
+      reviewAllAbortController = new AbortController();
+      let results = null;
+      try {
+        const res = await fetch(`http://localhost:8000/review_all?source=${source}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: jobDescription ? JSON.stringify(jobDescription) : null,
+          signal: reviewAllAbortController.signal
+        });
+        results = await res.json();
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          document.getElementById('allReviewsBox').innerHTML = '<div style="color:#c62828;font-weight:600;">Review all CVs stopped by user.</div>';
+        } else {
+          document.getElementById('allReviewsBox').innerHTML = '<div style="color:#c62828;font-weight:600;">Error occurred during review.</div>';
+        }
+        document.getElementById('reviewAllBtn').disabled = false;
+        document.getElementById('stopReviewAllBtn').style.display = 'none';
+        return;
+      }
+      document.getElementById('reviewAllBtn').disabled = false;
+      document.getElementById('stopReviewAllBtn').style.display = 'none';
       if (!Array.isArray(results) || results.length === 0) {
         document.getElementById('allReviewsBox').innerHTML = 'No reviews found.';
         return;
       }
-      let html = `<h2>All CVs Ranked by Fit Score</h2><table border='1' cellpadding='6' style='border-collapse:collapse;'><tr><th>Rank</th><th>CV Name</th><th>Fit Score</th><th>Review</th></tr>`;
+      // Summary info
+      const topScore = Math.max(...results.map(r => r.fit_score));
+      const summary = `<div class='summary-box'>Total CVs: <b>${results.length}</b> &nbsp;|&nbsp; Top Fit Score: <b>${topScore}</b></div>`;
+      let html =
+        `<h2>All CVs Ranked by Fit Score</h2>` + summary +
+        `<div class='table-scroll'><table class='cv-table'><tr>
+          <th title='Ranking order (1 = best fit)'>Rank</th>
+          <th title='Candidate CV file name'>CV Name</th>
+          <th title='Candidate CV file name (duplicate column)'>CV Name</th>
+          <th title='AI-assigned fit score (0-100)'>Fit Score</th>
+          <th title='AI-generated review and feedback'>Review</th>
+        </tr>`;
       results.forEach((r, i) => {
-        html += `<tr><td>${i+1}</td><td>${r.cv_name}</td><td style='text-align:center;'>${r.fit_score}</td><td>${marked.parse(r.review)}</td></tr>`;
+        html += `<tr>
+          <td style='text-align:left;vertical-align:top;'>${i+1}</td>
+          <td style='text-align:left;vertical-align:top;' title='${r.cv_name}'>${r.cv_name}</td>
+          <td style='text-align:left;vertical-align:top;' title='${r.cv_name}'>${r.cv_name}</td>
+          <td style='text-align:left;vertical-align:top;'>${r.fit_score}</td>
+          <td style='text-align:left;vertical-align:top;'>${marked.parse(r.review)}</td>
+        </tr>`;
       });
-      html += '</table>';
+      html += '</table></div>';
       document.getElementById('allReviewsBox').innerHTML = html;
+    }
+    function stopReviewAllCVs() {
+      if (reviewAllAbortController) {
+        reviewAllAbortController.abort();
+      }
     }
   </script>
 </body>
