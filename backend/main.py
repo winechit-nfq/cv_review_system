@@ -120,18 +120,24 @@ def run_gemini_review(cv_text, cv_name):
     if not gemini_api_key:
         return "Gemini API key not set."
     # Setup CrewAI agent with Gemini
+    
     agent = Agent(
         name="CV Reviewer",
-        llm="gemini",
-        llm_api_key=gemini_api_key,
-        system_prompt="You are an expert HR reviewer. Review the following CV for skills, experience, and formatting. Give clear, actionable feedback."
+        role="HR Expert",  # Add a role
+        goal="Review CVs for skills, experience, and formatting",  # Add a goal
+        backstory="An experienced HR professional who provides actionable feedback on CVs.",  # Add a backstory
     )
-    crew = Crew(agents=[agent])
     task = Task(
-        description=f"Review the following CV named {cv_name} for skills, experience, and formatting. Provide structured feedback.\n\nCV Content:\n{cv_text}",
-        agent=agent
+        description="Review the following CV named {cv_name} for skills, experience, and formatting. Provide structured feedback.\n\nCV Content:\n{cv_text}",
+        agent=agent,
+        expected_output="A structured, actionable review of the CV, including feedback on skills, experience, and formatting."
     )
-    result = crew.run(task)
+    crew = Crew(
+        agents=[agent],
+        tasks=[task],
+    )
+    
+    result = crew.kickoff()
     return result
 
 @app.get("/cvs", response_model=List[CVInfo])
@@ -152,6 +158,9 @@ def review_cv(cv: CVInfo):
         return ReviewResult(cv_name=cv.name, review="Invalid source.")
     # Run CrewAI + Gemini review
     review = run_gemini_review(cv_text, cv.name)
+    # Extract string if needed
+    if hasattr(review, "raw"):
+        review = review.raw
     return ReviewResult(cv_name=cv.name, review=review)
 
 @app.get("/cv_content", response_class=PlainTextResponse)
