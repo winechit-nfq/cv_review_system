@@ -1,4 +1,4 @@
-    :root {
+:root {
       --primary: #FF6B00;
       --primary-hover: #E55A00;
       --primary-light: #FFF4E6;
@@ -247,7 +247,7 @@
     /* CV List */
     .cv-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
       gap: 1.5rem;
       margin-top: 1.5rem;
     }
@@ -442,7 +442,7 @@
     }
 
     .cv-info-cell {
-      min-width: 180px;
+      min-width: 120px; /* decreased from 180px */
     }
 
     .actions-cell {
@@ -456,7 +456,7 @@
     }
 
     .review-content {
-      max-width: 400px;
+      max-width: 600px; /* increased from 400px */
       line-height: 1.5;
     }
 
@@ -501,7 +501,7 @@
 
     .preview-content {
       padding: 1.5rem;
-      max-height: 400px;
+      max-height: 600px;
       overflow-y: auto;
       font-family: 'Monaco', 'Menlo', monospace;
       font-size: 0.85rem;
@@ -583,12 +583,15 @@
         max-width: 150px;
       }
 
-      .review-content {
-        max-width: 250px;
-        font-size: 0.8rem;
+      .cv-info-cell {
+        min-width: 90px; /* also decrease for mobile */
       }
 
-      .action-buttons {
+    .review-content {
+        max-width: 600px;
+        font-size: 0.8rem;
+    }    
+    .action-buttons {
         flex-direction: column;
       }
     }

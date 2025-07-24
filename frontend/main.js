@@ -16,7 +16,8 @@ async function loadCVs() {
       <div class="loading-text">Loading CVs from ${source}...</div>
     </div>
   `;
-
+// Scroll to bottom after loading starts
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   // Hide other sections
   hideAllSections();
 
@@ -36,6 +37,8 @@ async function loadCVs() {
         </div>
       `;
       reviewAllBtn.disabled = true;
+      // Scroll to bottom after loading
+      cvListContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
       return;
     } else {
       reviewAllBtn.disabled = false;
@@ -70,6 +73,8 @@ async function loadCVs() {
       </div>
     `;
   }
+
+  
 }
 
 // Extract owner name from CV filename or path
@@ -100,6 +105,9 @@ async function reviewCV(cv) {
       <div class="loading-text">Analyzing CV: ${cv.name}...</div>
     </div>
   `;
+
+  // Scroll to bottom after loading starts
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
   try {
     const res = await fetch('http://localhost:8000/review', {
@@ -210,6 +218,9 @@ async function reviewAllCVs() {
     reviewAllBtn.disabled = false;
     stopBtn.style.display = 'none';
   }
+
+  document.getElementById('allReviewsBox').style.display = 'block';
+  document.getElementById('allReviewsBox').scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
 
 // Stop review all process
