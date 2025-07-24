@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+crewai
+google-api-python-client
+google-auth
+PyGithub
+python-dotenv
+python-docx
+pdfminer.six 

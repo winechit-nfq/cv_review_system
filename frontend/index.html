@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV Review System</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    .cv-list { margin-top: 1em; }
+    .review-box { margin-top: 2em; border: 1px solid #ccc; padding: 1em; border-radius: 5px; }
+    button { margin-left: 1em; }
+  </style>
+</head>
+<body>
+  <h1>CV Review System</h1>
+  <label for="source">Select Source:</label>
+  <select id="source">
+    <option value="gdrive">Google Drive</option>
+    <option value="github">GitHub</option>
+  </select>
+  <button onclick="loadCVs()">Load CVs</button>
+
+  <div class="cv-list" id="cvList"></div>
+  <div class="review-box" id="reviewBox" style="display:none;"></div>
+  <div class="preview-box" id="previewBox" style="display:none; margin-top:2em; border:1px solid #aaa; padding:1em; border-radius:5px; background:#f9f9f9;"></div>
+
+  <script>
+    async function loadCVs() {
+      const source = document.getElementById('source').value;
+      document.getElementById('cvList').innerHTML = 'Loading...';
+      const res = await fetch(`/cvs?source=${source}`);
+      const cvs = await res.json();
+      let html = '<ul>';
+      cvs.forEach(cv => {
+        html += `<li>${cv.name} <button onclick='reviewCV(${JSON.stringify(cv)})'>Review</button> <button onclick='previewCV(${JSON.stringify(cv)})'>Preview</button></li>`;
+      });
+      html += '</ul>';
+      document.getElementById('cvList').innerHTML = html;
+      document.getElementById('reviewBox').style.display = 'none';
+      document.getElementById('previewBox').style.display = 'none';
+    }
+
+    async function reviewCV(cv) {
+      document.getElementById('reviewBox').style.display = 'block';
+      document.getElementById('reviewBox').innerHTML = 'Reviewing...';
+      const res = await fetch('/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cv)
+      });
+      const result = await res.json();
+      document.getElementById('reviewBox').innerHTML = `<h3>Review for ${result.cv_name}</h3><p>${result.review}</p>`;
+    }
+
+    async function previewCV(cv) {
+      document.getElementById('previewBox').style.display = 'block';
+      document.getElementById('previewBox').innerHTML = 'Loading preview...';
+      const res = await fetch(`/cv_content?source=${cv.source}&path=${encodeURIComponent(cv.path)}`);
+      const text = await res.text();
+      document.getElementById('previewBox').innerHTML = `<h3>Preview: ${cv.name}</h3><pre style='white-space:pre-wrap; max-height:300px; overflow:auto;'>${text}</pre>`;
+    }
+  </script>
+</body>
+</html> 
