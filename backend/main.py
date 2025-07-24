@@ -25,6 +25,7 @@ class CVInfo(BaseModel):
     name: str
     source: str  # 'gdrive' or 'github'
     path: str
+    job_description: Optional[str] = None
 
 # Placeholder for review result
 class ReviewResult(BaseModel):
@@ -115,7 +116,7 @@ def get_github_cv_content(path):
         return '\n'.join([p.text for p in doc.paragraphs])
     return "Unsupported file type"
 
-def run_gemini_review(cv_text, cv_name):
+def run_gemini_review(cv_text, cv_name, job_description=None):
     gemini_api_key = os.getenv("GEMINI_API_KEY")
     if not gemini_api_key:
         return "Gemini API key not set."
@@ -127,10 +128,14 @@ def run_gemini_review(cv_text, cv_name):
         goal="Review CVs for skills, experience, and formatting",  # Add a goal
         backstory="An experienced HR professional who provides actionable feedback on CVs.",  # Add a backstory
     )
+    description = f"Review the following CV named {cv_name} for skills, experience, and formatting."
+    if job_description:
+        description += f"\n\nMatch the CV to the following job description and provide feedback on fit:\n{job_description}"
+    description += f"\n\nCV Content:\n{cv_text}"
     task = Task(
-        description="Review the following CV named {cv_name} for skills, experience, and formatting. Provide structured feedback.\n\nCV Content:\n{cv_text}",
+        description=description,
         agent=agent,
-        expected_output="A structured, actionable review of the CV, including feedback on skills, experience, and formatting."
+        expected_output="A structured, actionable review of the CV, including feedback on skills, experience, formatting, and fit for the job description if provided."
     )
     crew = Crew(
         agents=[agent],
@@ -156,9 +161,8 @@ def review_cv(cv: CVInfo):
         cv_text = get_github_cv_content(cv.path)
     else:
         return ReviewResult(cv_name=cv.name, review="Invalid source.")
-    # Run CrewAI + Gemini review
-    review = run_gemini_review(cv_text, cv.name)
-    # Extract string if needed
+    # Run CrewAI + Gemini review, now with job description
+    review = run_gemini_review(cv_text, cv.name, cv.job_description)
     if hasattr(review, "raw"):
         review = review.raw
     return ReviewResult(cv_name=cv.name, review=review)
