@@ -180,7 +180,9 @@ async function reviewAllCVs() {
       <div class="loading-text">AI is analyzing and ranking all CVs...</div>
     </div>
   `;
-
+  // Scroll to top of the review box
+  allReviewsBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  
   reviewAllBtn.disabled = true;
   stopBtn.style.display = 'inline-flex';
   reviewAllAbortController = new AbortController();
