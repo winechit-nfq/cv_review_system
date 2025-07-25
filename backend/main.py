@@ -183,24 +183,112 @@ def review_all_cvs(
     source: str = Query(..., regex="^(gdrive|github)$"),
     job_description: Optional[str] = Body(None)
 ):
-    # List all CVs
-    if source == 'gdrive':
-        cvs = list_gdrive_cvs()
-    else:
-        cvs = list_github_cvs()
+    # Step 1: List all CVs based on source
+    cvs = list_gdrive_cvs() if source == 'gdrive' else list_github_cvs()
     results = []
+
     for cv in cvs:
-        cv_text = get_gdrive_cv_content(cv.path) if cv.source == 'gdrive' else get_github_cv_content(cv.path)
-        review = run_gemini_review(cv_text, cv.name, job_description)
-        if hasattr(review, "raw"):
-            review = review.raw
-        # Extract fit score from the review (expecting 'Fit Score: <number>')
-        match = re.search(r"Fit Score:\s*(\d+)", review)
-        fit_score = int(match.group(1)) if match else 0
-        results.append(ReviewAllResult(cv_name=cv.name, review=review, fit_score=fit_score))
-    # Sort by fit_score descending
+        try:
+            # Step 2: Get CV text
+            cv_text = (
+                get_gdrive_cv_content(cv.path)
+                if cv.source == 'gdrive'
+                else get_github_cv_content(cv.path)
+            )
+
+            # Step 3: Run Gemini/CrewAI review
+            review_output = run_gemini_review(cv_text, cv.name, job_description)
+            review = review_output.raw if hasattr(review_output, "raw") else str(review_output)
+
+            # Step 4: Extract fit score with improved regex and parsing
+            fit_score = extract_fit_score(review)
+
+            # Debug logging
+            print(f"[DEBUG] {cv.name} Fit Score: {fit_score}")
+
+            # Step 5: Append result
+            results.append(ReviewAllResult(
+                cv_name=cv.name,
+                review=review,
+                fit_score=fit_score
+            ))
+
+        except Exception as e:
+            # Don't let one error fail all
+            print(f"[ERROR] Failed to process CV '{cv.name}': {e}")
+            results.append(ReviewAllResult(
+                cv_name=cv.name,
+                review=f"[Error processing CV: {str(e)}]",
+                fit_score=0
+            ))
+
+    # Step 6: Sort by fit score (descending)
     results.sort(key=lambda x: x.fit_score, reverse=True)
     return results
+
+
+def extract_fit_score(review_text: str) -> int:
+    """
+    Extract fit score from review text with multiple fallback patterns.
+    Returns an integer between 0-100, defaulting to 0 if not found.
+    """
+    if not review_text:
+        return 0
+    
+    # Multiple regex patterns to catch different formats
+    patterns = [
+        # "Fit Score: 85" or "fit score: 85" (case insensitive, at start of line)
+        r"(?i)^fit\s*score\s*:\s*(\d+(?:\.\d+)?)",
+        
+        # "Fit Score: 85" anywhere in text
+        r"(?i)fit\s*score\s*:\s*(\d+(?:\.\d+)?)",
+        
+        # "Score: 85" or "Overall Score: 85"
+        r"(?i)(?:overall\s+)?score\s*:\s*(\d+(?:\.\d+)?)",
+        
+        # "85/100" or "85 out of 100"
+        r"(\d+(?:\.\d+)?)\s*(?:/100|out\s+of\s+100)",
+        
+        # Numbers followed by % (assuming it's out of 100)
+        r"(\d+(?:\.\d+)?)%",
+        
+        # Just look for any number in parentheses like "(85)"
+        r"\((\d+(?:\.\d+)?)\)",
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, review_text, re.MULTILINE)
+        if matches:
+            try:
+                # Take the first match
+                score = float(matches[0])
+                
+                # Ensure score is within reasonable bounds (0-100)
+                if score > 100:
+                    score = min(score, 100)  # Cap at 100
+                elif score < 0:
+                    score = 0
+                
+                return int(round(score))
+            except (ValueError, TypeError) as e:
+                print(f"[WARN] Failed to parse score '{matches[0]}': {e}")
+                continue
+    
+    # If no patterns match, try to find any number that might be a score
+    # Look for standalone numbers between 0-100
+    standalone_numbers = re.findall(r'\b(\d+(?:\.\d+)?)\b', review_text)
+    for num_str in standalone_numbers:
+        try:
+            num = float(num_str)
+            if 0 <= num <= 100:
+                print(f"[INFO] Using standalone number {num} as potential fit score")
+                return int(round(num))
+        except ValueError:
+            continue
+    
+    print(f"[WARN] No fit score found in review text: {review_text[:200]}...")
+    return 0
+
 
 @app.get("/cv_content", response_class=PlainTextResponse)
 def get_cv_content(source: str, path: str):
