@@ -1,0 +1,47 @@
+general_cv_review_task:
+  description: >
+    Review the CV of candidate "{cv_name}" to evaluate overall quality, alignment with the job description: "{job_description}", and transferable skills.
+    Consider the content of their CV:
+    ---
+    {cv_text}
+    ---
+    Assess soft skills, clarity of presentation, adaptability, and any notable accomplishments across industries or roles that relate to the job.
+  expected_output: >
+    A summary with 10 bullet points for candidate "{cv_name}" highlighting strengths, weaknesses, and recommendations for improvement across general areas such as communication, career progression, and relevance to the job requirements.
+  agent: cv_reviewer_generalist
+
+software_engineer_cv_review_task:
+  description: >
+    Analyze the CV of candidate "{cv_name}" for technical expertise in software development, specifically in the context of the job description: "{job_description}".
+    Consider this CV content:
+    ---
+    {cv_text}
+    ---
+    Focus on programming languages, tools, frameworks, project experience, architectural thinking, and problem-solving abilities that match the stated role.
+  expected_output: >
+    A list of 10 bullet points summarizing for "{cv_name}" their relevant technical skills, project impact, code quality indicators, and suggestions to strengthen the technical presentation of the CV.
+  agent: cv_reviewer_software_engineer
+
+ux_designer_cv_review_task:
+  description: >
+    Evaluate the CV of candidate "{cv_name}" and their portfolio (if mentioned) to assess alignment with the design expectations outlined in the job description: "{job_description}".
+    Review the following CV:
+    ---
+    {cv_text}
+    ---
+    Consider their UX process, user research involvement, interaction design, visual communication, and collaboration practices.
+  expected_output: >
+    A list of 10 bullet points highlighting for "{cv_name}" their strengths in user-centered design, storytelling, creativity, and areas where the CV could better demonstrate their value for the specific role.
+  agent: cv_reviewer_ux_designer
+
+product_manager_cv_review_task:
+  description: >
+    Review the CV of candidate "{cv_name}" to assess their product management skills in the context of the job description: "{job_description}".
+    The CV is provided below:
+    ---
+    {cv_text}
+    ---
+    Look for experience in product strategy, delivery, cross-functional collaboration, and business impact.
+  expected_output: >
+    A list of 10 bullet points highlighting for "{cv_name}" their relevant achievements, team leadership, prioritization ability, communication strengths, and recommendations to improve CV alignment with the role.
+  agent: cv_reviewer_product_manager

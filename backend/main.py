@@ -10,7 +10,7 @@ from fastapi.responses import PlainTextResponse
 import base64
 from crewai import Crew, Agent, Task
 import re
-import json
+from backend.crew import CrewAI
 
 app = FastAPI()
 
@@ -128,32 +128,12 @@ def run_gemini_review(cv_text, cv_name, job_description=None):
     if not gemini_api_key:
         return "Gemini API key not set."
     # Setup CrewAI agent with Gemini
-    
-    agent = Agent(
-        name="CV Reviewer",
-        role="HR Expert",  # Add a role
-        goal="Review CVs for skills, experience, and formatting",  # Add a goal
-        backstory="An experienced HR professional who provides actionable feedback on CVs.",  # Add a backstory
-    )
-    description = f"Review the following CV named {cv_name} for skills, experience, and formatting."
-    if job_description:
-        description += f"\n\nMatch the CV to the following job description and provide feedback on fit:\n{job_description}"
-    # Ask for a numeric fit score in the output
-    description += ("\n\nCV Content:\n" + cv_text +
-        "\n\nIn your response, provide a numeric fit score (0-100) for how well this CV matches the job description, "
-        "and then provide a structured, actionable review. Format your response as follows:\n"
-        "Fit Score: <number>\nReview: <your review text>")
-    task = Task(
-        description=description,
-        agent=agent,
-        expected_output="A structured, actionable review of the CV, including feedback on skills, experience, formatting, and fit for the job description if provided. Include a numeric fit score (0-100) at the top of your response."
-    )
-    crew = Crew(
-        agents=[agent],
-        tasks=[task],
-    )
-    
-    result = crew.kickoff()
+    inputs = {
+        'cv_name': cv_name,
+        'cv_text': cv_text ,
+        'job_description': job_description,
+    }
+    result = CrewAI().crew().kickoff(inputs=inputs)
     return result
 
 @app.get("/cvs", response_model=List[CVInfo])
