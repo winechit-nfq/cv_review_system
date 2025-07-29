@@ -6,21 +6,14 @@ general_cv_review_task:
     {cv_text}
     ---
     Assess soft skills, clarity of presentation, adaptability, and any notable accomplishments across industries or roles that relate to the job.
+    Your analysis will be collected and used by the senior technical reviewer for the final assessment.
   expected_output: >
-    A summary with 10 bullet points for candidate "{cv_name}" highlighting strengths, weaknesses, and recommendations for improvement across general areas such as communication, career progression, and relevance to the job requirements.
+    A comprehensive summary with 15 bullet points for candidate "{cv_name}":
+    - 8 bullet points highlighting key strengths across general areas such as communication, career progression, and relevance to the job requirements
+    - 4 bullet points identifying specific weaknesses, gaps, or areas of concern
+    - 3 bullet points with actionable recommendations for improvement
+    Include overall candidate profile insights that will inform the final technical evaluation.
   agent: cv_reviewer_generalist
-
-software_engineer_cv_review_task:
-  description: >
-    Analyze the CV of candidate "{cv_name}" for technical expertise in software development, specifically in the context of the job description: "{job_description}".
-    Consider this CV content:
-    ---
-    {cv_text}
-    ---
-    Focus on programming languages, tools, frameworks, project experience, architectural thinking, and problem-solving abilities that match the stated role.
-  expected_output: >
-    A list of 10 bullet points summarizing for "{cv_name}" their relevant technical skills, project impact, code quality indicators, and suggestions to strengthen the technical presentation of the CV.
-  agent: cv_reviewer_software_engineer
 
 ux_designer_cv_review_task:
   description: >
@@ -30,8 +23,13 @@ ux_designer_cv_review_task:
     {cv_text}
     ---
     Consider their UX process, user research involvement, interaction design, visual communication, and collaboration practices.
+    Your design-focused insights will be collected and incorporated into the final technical assessment.
   expected_output: >
-    A list of 10 bullet points highlighting for "{cv_name}" their strengths in user-centered design, storytelling, creativity, and areas where the CV could better demonstrate their value for the specific role.
+    A detailed analysis with 15 bullet points for candidate "{cv_name}":
+    - 8 bullet points highlighting strengths in user-centered design, storytelling, creativity, and design process capabilities
+    - 4 bullet points identifying design-related weaknesses, missing elements, or areas where the CV falls short of role expectations
+    - 3 bullet points with specific recommendations on how the CV could better demonstrate their value for the specific role
+    Focus on design capabilities and gaps that will contribute to the overall candidate evaluation.
   agent: cv_reviewer_ux_designer
 
 product_manager_cv_review_task:
@@ -42,6 +40,38 @@ product_manager_cv_review_task:
     {cv_text}
     ---
     Look for experience in product strategy, delivery, cross-functional collaboration, and business impact.
+    Your strategic assessment will be collected and used by the senior technical reviewer for final evaluation.
   expected_output: >
-    A list of 10 bullet points highlighting for "{cv_name}" their relevant achievements, team leadership, prioritization ability, communication strengths, and recommendations to improve CV alignment with the role.
+    A strategic analysis with 15 bullet points for candidate "{cv_name}":
+    - 8 bullet points highlighting relevant achievements, team leadership, prioritization ability, and communication strengths
+    - 4 bullet points identifying weaknesses in product management experience, strategic thinking gaps, or missing competencies
+    - 3 bullet points with recommendations to improve CV alignment with the role and address identified gaps
+    Provide insights on product thinking strengths and weaknesses that will inform the final assessment.
   agent: cv_reviewer_product_manager
+
+software_engineer_cv_review_task:
+  description: >
+    Conduct a comprehensive final assessment of candidate "{cv_name}" for the software engineering role described in: "{job_description}".
+    
+    First, analyze the CV content for technical expertise:
+    ---
+    {cv_text}
+    ---
+    
+    Then, collect and synthesize the assessments from the three specialist reviewers:
+    1. Generalist reviewer's insights on overall candidate profile and transferable skills
+    2. UX designer reviewer's analysis of design thinking and user experience capabilities  
+    3. Product manager reviewer's evaluation of strategic thinking and stakeholder management skills
+    
+    Focus on programming languages, tools, frameworks, project experience, architectural thinking, and problem-solving abilities that match the stated role.
+    Integrate cross-functional insights to provide a holistic evaluation of the candidate's potential for success.
+  expected_output: >
+    A comprehensive final assessment report for "{cv_name}" containing:
+    **Final Assessment**:
+    - Candidate Fit Score: [X/100] with detailed justification including both strengths and weaknesses
+    - Recommendation: [Strong Hire/Hire/Maybe/No Hire]
+    - Top 3 strengths for this specific role
+    - Top 3 critical weaknesses or red flags
+    - Top 3 areas for growth or interview focus
+    - Executive summary of why this candidate would/wouldn't succeed in the position, addressing both positive and negative factors
+  agent: cv_reviewer_software_engineer
