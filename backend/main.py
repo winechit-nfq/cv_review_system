@@ -61,7 +61,7 @@ def list_gdrive_cvs():
     return [CVInfo(name=f["name"], source="gdrive", path=f["id"]) for f in files]
 
 def list_github_cvs():
-    token = os.getenv("GITHUB_TOKEN")
+    token = os.getenv("GITHUB_TK")
     repo_name = os.getenv("GITHUB_REPO")
     folder_path = os.getenv("GITHUB_FOLDER", "")
     if not token or not repo_name:
@@ -102,7 +102,7 @@ def get_gdrive_cv_content(file_id):
     return "Unsupported file type"
 
 def get_github_cv_content(path):
-    token = os.getenv("GITHUB_TOKEN")
+    token = os.getenv("GITHUB_TK")
     repo_name = os.getenv("GITHUB_REPO")
     if not token or not repo_name:
         return ""
