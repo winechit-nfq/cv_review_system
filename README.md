@@ -1,103 +1,196 @@
-# CV Review System for HR
 
-This system allows HR to review CVs using CrewAI with Gemini API, reading CVs from Google Drive or GitHub.
+# 🤖 CV Review System
 
-## Setup
+An intelligent CV analysis platform that revolutionizes HR recruitment. Powered by Google's Gemini API, it provides automated CV review, smart candidate ranking, and seamless integration with popular document sources.
 
-1. Clone the repository and navigate to the project directory.
-2. Create a virtual environment and install dependencies:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-3. Copy `.env.example` to `.env` and fill in your API keys:
-   - `GEMINI_API_KEY`: Your Gemini API key
-   - `GOOGLE_DRIVE_CREDENTIALS`: Google Drive credentials (JSON string or path)
-   - `GOOGLE_DRIVE_FOLDER_ID`: Google Drive folder ID containing CVs
-   - `GITHUB_TOKEN`: GitHub personal access token
-   - `GITHUB_REPO`: GitHub repo in `owner/repo` format
-   - `GITHUB_FOLDER`: (Optional) Path to folder in repo containing CVs
+## ✨ Key Features
 
-## Running the Backend
+- 🔄 **Smart CV Management**
+  - Import from Google Drive or GitHub
+  - Support for PDF and DOCX formats
+  - Bulk CV processing
+  
+- 🤖 **AI-Powered Analysis**
+  - Advanced CV parsing and understanding
+  - Skill matching with job requirements
+  - Experience level assessment
+  - Education qualification analysis
+  
+- 📊 **Intelligent Ranking**
+  - Customizable scoring system
+  - Automated candidate ranking
+  - Comparative analysis
+  - Detailed match percentages
+  
+- 🎯 **Job Matching**
+  - Real-time requirement matching
+  - Skills gap analysis
+  - Cultural fit assessment
+  - Experience relevance scoring
+  
+- 👀 **Enhanced User Experience**
+  - Instant CV preview
+  - Dark/Light mode
+  - Responsive design
+  - Keyboard shortcuts
+  
+- 📈 **Reporting & Analytics**
+  - Exportable results (CSV, PDF)
+  - Batch processing statistics
+  - Candidate comparison charts
+  - Historical data tracking
+
+## � System Requirements
+
+### Minimum Requirements
+- CPU: Dual-core processor
+- RAM: 4GB
+- Storage: 500MB free space
+- Internet: Stable connection (1Mbps+)
+
+### Recommended Setup
+- CPU: Quad-core processor
+- RAM: 8GB
+- Storage: 1GB free space
+- Internet: 5Mbps+ connection
+
+### Software Prerequisites
+- Python 3.8 or higher
+- Modern web browser (Chrome 90+, Firefox 90+, Safari 15+)
+- Google Cloud account (for API access)
+- GitHub account (optional)
+
+## 🚀 Installation Guide
+
+### 1. Project Setup
 
 ```bash
-uvicorn backend.main:app --reload
-```
+# Clone the repository
+git clone https://github.com/winechit-nfq/cv_review_system.git
+cd cv_review_system
 
-## API Endpoints
-- `GET /cvs?source=gdrive|github` — List CVs from Google Drive or GitHub
-- `POST /review` — Review a selected CV
+# Create virtual environment
+python3 -m venv venv
 
-## Frontend
-A simple web UI will be provided for HR to interact with the system. 
-
----
-
-## 1. **Set Up Environment Variables**
-
-Create a `.env` file in your project root (or copy from `.env.example`) and fill in:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-
-GOOGLE_DRIVE_CREDENTIALS=your_google_drive_credentials_here
-GOOGLE_DRIVE_FOLDER_ID=your_gdrive_folder_id_here
-
-GITHUB_TOKEN=your_github_token_here
-GITHUB_REPO=your_github_owner/your_repo_name
-GITHUB_FOLDER=path/to/cv/folder  # optional
-```
-
----
-
-## 2. **Activate the Virtual Environment**
-
-```bash
+# Activate virtual environment
+# On macOS/Linux:
 source venv/bin/activate
+
+# On Windows (CMD):
+venv\Scripts\activate.bat
+
+# On Windows (PowerShell):
+venv\Scripts\Activate.ps1
 ```
 
----
-
-## 3. **Install All Requirements**
+### 2. Dependencies Installation
 
 ```bash
+# Update pip to latest version
+python -m pip install --upgrade pip
+
+# Install core dependencies
 pip install -r requirements.txt
+
+# Install additional Google API packages
+pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+# Install optional utilities (recommended)
+pip install rich  # for better terminal output
+pip install python-dotenv  # for environment management
 ```
 
-If you see errors about missing packages (like `googleapiclient`), also run:
+### 3. Configure Your Environment
+
+1. Create `.env` file from template:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Add your credentials:
+   ```env
+   # Required: Gemini API credentials
+   GEMINI_API_KEY=your_gemini_api_key
+
+   # For Google Drive integration
+   GOOGLE_DRIVE_CREDENTIALS=path/to/credentials.json  # or JSON string
+   GOOGLE_DRIVE_FOLDER_ID=your_folder_id
+
+   # For GitHub integration (optional)
+   GITHUB_TOKEN=your_personal_access_token
+   GITHUB_REPO=username/repository
+   GITHUB_FOLDER=path/to/cv/folder  # optional
+   ```
+
+## 🖥️ Application Launch Guide
+
+### 1. Start Backend Server
 
 ```bash
-pip install google-api-python-client
+# Ensure you're in the project root and virtual environment is activated
+cd cv_review_system
+source venv/bin/activate
+
+# Start the FastAPI backend server
+uvicorn backend.main:app --reload --port 8000 --host 0.0.0.0
 ```
 
----
+The backend API will be available at:
+- Local: http://127.0.0.1:8000
+- Network: http://your-ip:8000
 
-## 4. **Run the Backend Server**
+### 2. Launch Frontend Interface
 
+Option 1: Development Server (Recommended)
 ```bash
-uvicorn backend.main:app --reload
+# Ensure virtual environment is activated
+source /Users/nfqlocal/cv_review_system/venv/bin/activate
+
+# Navigate to frontend directory and start server
+cd frontend
+python -m http.server 8080
 ```
 
-- The server will run at: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+Access the application at:
+- Local: http://localhost:8080
+- Network: http://your-ip:8080
 
----
+Option 2: Static File Access
+- **macOS/Linux**: 
+  ```bash
+  open frontend/index.html
+  ```
+- **Windows**: 
+  ```bash
+  start frontend/index.html
+  ```
+- **Alternative**: Use any static file server (nginx, Apache, etc.)
 
-## 5. **Open the Frontend**
 
-Open `frontend/index.html` in your browser (double-click or use `open frontend/index.html` on Mac).
+## 🔗 API Reference
 
----
+### Core Endpoints
 
-## 6. **Usage**
+- `GET /cvs`
+  - **Query**: `?source=gdrive|github`
+  - **Response**: List of available CVs
 
-- Select the source (Google Drive or GitHub).
-- Click “Load CVs” to see the list.
-- Use “Preview” to see the CV content.
-- Use “Review” to get an AI-generated review.
+- `POST /review`
+  - **Body**: CV info and job description
+  - **Response**: Detailed AI analysis
 
----
+### Getting Help
 
-**If you see errors about missing modules, make sure you’re in the virtual environment and all dependencies are installed.**
+- Check the [Issues](https://github.com/winechit-nfq/cv_review_system/issues) section
+- Join our community discussions
+- Contact support team
 
-If you need help with any step or see an error, let me know the details! 
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with CrewAI and Gemini API
+- Frontend uses modern web technologies
+- Special thanks to all contributors
