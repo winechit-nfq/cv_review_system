@@ -1,1 +1,3 @@
-.env
+.DS_Store
+report.md
+google_drive_credentials.json
