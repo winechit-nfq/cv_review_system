@@ -10,6 +10,7 @@ from fastapi.responses import PlainTextResponse
 import base64
 from crewai import Crew, Agent, Task
 import re
+import json
 from backend.crew import CrewAI
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -46,13 +47,13 @@ def list_gdrive_cvs():
     folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
     if not creds_json or not folder_id:
         return []
-    import json
+    
     if creds_json.strip().startswith('{'):
         creds_dict = json.loads(creds_json)
     else:
         with open(creds_json) as f:
             creds_dict = json.load(f)
-    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive.readonly"])
+    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
     service = build('drive', 'v3', credentials=creds)
     results = service.files().list(
         q=f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document') and trashed=false",
@@ -77,6 +78,58 @@ def list_github_cvs():
             cv_files.append(CVInfo(name=f.name, source="github", path=f.path))
     return cv_files
 
+def move_to_qualified_folder(file_id: str) -> bool:
+    """Move the file to the qualified candidates folder in Google Drive."""
+    try:
+        creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+        qualified_folder_id = os.getenv("GOOGLE_DRIVE_QUALIFIED_FOLDER_ID")
+        
+        if not creds_json or not qualified_folder_id:
+            print("[ERROR] Google Drive credentials or qualified folder ID not set")
+            return False
+            
+        if creds_json.strip().startswith('{'):
+            creds_dict = json.loads(creds_json)
+        else:
+            with open(creds_json) as f:
+                creds_dict = json.load(f)
+                
+        creds = service_account.Credentials.from_service_account_info(
+            creds_dict, 
+            scopes=["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+        )
+        service = build('drive', 'v3', credentials=creds)
+        
+        try:
+            # Get current file metadata including parents
+            file = service.files().get(
+                fileId=file_id,
+                fields='parents,name'
+            ).execute()
+            
+            # Remove the file from its current folder
+            previous_parents = ",".join(file.get('parents', []))
+            
+            # Move the file to the qualified folder
+            updated_file = service.files().update(
+                fileId=file_id,
+                addParents=qualified_folder_id,
+                removeParents=previous_parents,
+                fields='id, parents, name'
+            ).execute()
+            
+            print(f"[INFO] Successfully moved file {file.get('name')} to qualified folder")
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Error accessing file {file_id}: {str(e)}")
+            return False
+        
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to move file {file_id} to qualified folder: {str(e)}")
+        return False
+
 def get_gdrive_cv_content(file_id):
     creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
     import json
@@ -85,7 +138,7 @@ def get_gdrive_cv_content(file_id):
     else:
         with open(creds_json) as f:
             creds_dict = json.load(f)
-    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive.readonly"])
+    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
     service = build('drive', 'v3', credentials=creds)
     file = service.files().get(fileId=file_id, fields="name, mimeType").execute()
     mime = file['mimeType']
@@ -197,10 +250,21 @@ async def review_all_cvs(
 
             # Debug logging
             print(f"[DEBUG] {cv.name} Fit Score: {fit_score}")
+            
+            # Step 5: Move qualified CVs to the qualified folder
+            moved_to_qualified = False
+            if fit_score > 60 and cv.source == 'gdrive':
+                moved_to_qualified = await loop.run_in_executor(
+                    executor,
+                    move_to_qualified_folder,
+                    cv.path
+                )
+                if moved_to_qualified:
+                    print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
 
             return ReviewAllResult(
                 cv_name=cv.name,
-                review=review,
+                review=f"{review}\n\n{'[Moved to qualified folder]' if moved_to_qualified else ''}",
                 fit_score=fit_score
             )
 
