@@ -11,6 +11,8 @@ import base64
 from crewai import Crew, Agent, Task
 import re
 from backend.crew import CrewAI
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 app = FastAPI()
 
@@ -159,25 +161,35 @@ def review_cv(cv: CVInfo):
     return ReviewResult(cv_name=cv.name, review=review)
 
 @app.post("/review_all", response_model=List[ReviewAllResult])
-def review_all_cvs(
+async def review_all_cvs(
     source: str = Query(..., regex="^(gdrive|github)$"),
     job_description: Optional[str] = Body(None)
 ):
     # Step 1: List all CVs based on source
     cvs = list_gdrive_cvs() if source == 'gdrive' else list_github_cvs()
     results = []
-
-    for cv in cvs:
+    
+    # Create a single ThreadPoolExecutor for all tasks
+    executor = ThreadPoolExecutor(max_workers=min(32, len(cvs) + 4))
+    loop = asyncio.get_event_loop()
+    
+    async def process_cv(cv):
         try:
             # Step 2: Get CV text
-            cv_text = (
-                get_gdrive_cv_content(cv.path)
-                if cv.source == 'gdrive'
-                else get_github_cv_content(cv.path)
+            cv_text = await loop.run_in_executor(
+                executor,
+                get_gdrive_cv_content if cv.source == 'gdrive' else get_github_cv_content,
+                cv.path
             )
 
             # Step 3: Run Gemini/CrewAI review
-            review_output = run_gemini_review(cv_text, cv.name, job_description)
+            review_output = await loop.run_in_executor(
+                executor,
+                run_gemini_review,
+                cv_text,
+                cv.name,
+                job_description
+            )
             review = review_output.raw if hasattr(review_output, "raw") else str(review_output)
 
             # Step 4: Extract fit score with improved regex and parsing
@@ -186,25 +198,32 @@ def review_all_cvs(
             # Debug logging
             print(f"[DEBUG] {cv.name} Fit Score: {fit_score}")
 
-            # Step 5: Append result
-            results.append(ReviewAllResult(
+            return ReviewAllResult(
                 cv_name=cv.name,
                 review=review,
                 fit_score=fit_score
-            ))
+            )
 
         except Exception as e:
             # Don't let one error fail all
             print(f"[ERROR] Failed to process CV '{cv.name}': {e}")
-            results.append(ReviewAllResult(
+            return ReviewAllResult(
                 cv_name=cv.name,
                 review=f"[Error processing CV: {str(e)}]",
                 fit_score=0
-            ))
+            )
+            
+    try:
+        # Process all CVs in parallel
+        tasks = [process_cv(cv) for cv in cvs]
+        results = await asyncio.gather(*tasks)
 
-    # Step 6: Sort by fit score (descending)
-    results.sort(key=lambda x: x.fit_score, reverse=True)
-    return results
+        # Sort results by fit score (descending)
+        sorted_results = sorted(results, key=lambda x: x.fit_score, reverse=True)
+        return sorted_results
+    finally:
+        # Ensure the executor is shut down properly
+        executor.shutdown(wait=True)
 
 
 def extract_fit_score(review_text: str) -> int:
