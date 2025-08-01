@@ -168,7 +168,7 @@ async def review_all_cvs(
     # Step 1: List all CVs based on source
     cvs = list_gdrive_cvs() if source == 'gdrive' else list_github_cvs()
     results = []
-    
+
     # Create a single ThreadPoolExecutor for all tasks
     executor = ThreadPoolExecutor(max_workers=min(32, len(cvs) + 4))
     loop = asyncio.get_event_loop()
