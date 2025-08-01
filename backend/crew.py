@@ -20,30 +20,30 @@ class CrewAI():
     # If you would like to add tools to your agents, you can learn more about it here:
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
-    def cv_reviewer_generalist(self) -> Agent:
+    def technical_architect_agent(self) -> Agent:
         return Agent(
-            config=self.agents_config['cv_reviewer_generalist'], 
+            config=self.agents_config['technical_architect_agent'], 
             verbose=True
         )
 
     @agent
-    def cv_reviewer_software_engineer(self) -> Agent:
+    def engineering_practice_agent(self) -> Agent:
         return Agent(
-            config=self.agents_config['cv_reviewer_software_engineer'], 
+            config=self.agents_config['engineering_practice_agent'], 
             verbose=True
         )
     
     @agent
-    def cv_reviewer_ux_designer(self) -> Agent:
+    def team_leadership_agent(self) -> Agent:
         return Agent(
-            config=self.agents_config['cv_reviewer_ux_designer'], 
+            config=self.agents_config['team_leadership_agent'], 
             verbose=True
         )
 
     @agent
-    def cv_reviewer_product_manager(self) -> Agent:
+    def software_engineer_agent(self) -> Agent:
         return Agent(
-            config=self.agents_config['cv_reviewer_product_manager'], 
+            config=self.agents_config['software_engineer_agent'], 
             verbose=True
         )
 
@@ -51,21 +51,21 @@ class CrewAI():
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
     @task
-    def general_cv_review_task(self) -> Task:
+    def technical_architecture_review_task(self) -> Task:
         return Task(
-            config=self.tasks_config['general_cv_review_task'], 
+            config=self.tasks_config['technical_architecture_review_task'], 
         )
 
     @task
-    def ux_designer_cv_review_task(self) -> Task:
+    def engineering_practice_review_task(self) -> Task:
         return Task(
-            config=self.tasks_config['ux_designer_cv_review_task'], 
+            config=self.tasks_config['engineering_practice_review_task'], 
         )
 
     @task
-    def product_manager_cv_review_task(self) -> Task:
+    def team_leadership_review_task(self) -> Task:
         return Task(
-            config=self.tasks_config['product_manager_cv_review_task'],
+            config=self.tasks_config['team_leadership_review_task'],
         )
 
     @task

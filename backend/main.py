@@ -229,21 +229,37 @@ async def review_all_cvs(
     async def process_cv(cv):
         try:
             # Step 2: Get CV text
-            cv_text = await loop.run_in_executor(
-                executor,
-                get_gdrive_cv_content if cv.source == 'gdrive' else get_github_cv_content,
-                cv.path
-            )
+            try:
+                cv_text = await loop.run_in_executor(
+                    executor,
+                    get_gdrive_cv_content if cv.source == 'gdrive' else get_github_cv_content,
+                    cv.path
+                )
+            except Exception as e:
+                print(f"[ERROR] Failed to get CV text for {cv.name}: {str(e)}")
+                return ReviewAllResult(
+                    cv_name=cv.name,
+                    review=f"Error getting CV content: {str(e)}",
+                    fit_score=0
+                )
 
             # Step 3: Run Gemini/CrewAI review
-            review_output = await loop.run_in_executor(
-                executor,
-                run_gemini_review,
-                cv_text,
-                cv.name,
-                job_description
-            )
-            review = review_output.raw if hasattr(review_output, "raw") else str(review_output)
+            try:
+                review_output = await loop.run_in_executor(
+                    executor,
+                    run_gemini_review,
+                    cv_text,
+                    cv.name,
+                    job_description
+                )
+                review = review_output.raw if hasattr(review_output, "raw") else str(review_output)
+            except Exception as e:
+                print(f"[ERROR] Failed to review CV {cv.name}: {str(e)}")
+                return ReviewAllResult(
+                    cv_name=cv.name,
+                    review=f"Error during CV review: {str(e)}",
+                    fit_score=0
+                )
 
             # Step 4: Extract fit score with improved regex and parsing
             fit_score = extract_fit_score(review)
@@ -253,14 +269,18 @@ async def review_all_cvs(
             
             # Step 5: Move qualified CVs to the qualified folder
             moved_to_qualified = False
-            if fit_score > 60 and cv.source == 'gdrive':
-                moved_to_qualified = await loop.run_in_executor(
-                    executor,
-                    move_to_qualified_folder,
-                    cv.path
-                )
-                if moved_to_qualified:
-                    print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
+            if fit_score > 70 and cv.source == 'gdrive':
+                try:
+                    moved_to_qualified = await loop.run_in_executor(
+                        executor,
+                        move_to_qualified_folder,
+                        cv.path
+                    )
+                    if moved_to_qualified:
+                        print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
+                except Exception as e:
+                    print(f"[ERROR] Failed to move CV {cv.name} to qualified folder: {str(e)}")
+                    # Continue processing even if move fails
 
             return ReviewAllResult(
                 cv_name=cv.name,
@@ -277,17 +297,44 @@ async def review_all_cvs(
                 fit_score=0
             )
             
+    if not cvs:
+        return []
+
     try:
         # Process all CVs in parallel
         tasks = [process_cv(cv) for cv in cvs]
-        results = await asyncio.gather(*tasks)
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Filter out any exceptions and convert them to error results
+            processed_results = []
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    print(f"[ERROR] Task for CV {cvs[i].name} failed: {str(result)}")
+                    processed_results.append(ReviewAllResult(
+                        cv_name=cvs[i].name,
+                        review=f"Error processing CV: {str(result)}",
+                        fit_score=0
+                    ))
+                else:
+                    processed_results.append(result)
 
-        # Sort results by fit score (descending)
-        sorted_results = sorted(results, key=lambda x: x.fit_score, reverse=True)
-        return sorted_results
+            # Sort results by fit score (descending)
+            sorted_results = sorted(processed_results, key=lambda x: x.fit_score, reverse=True)
+            return sorted_results
+        except Exception as e:
+            print(f"[ERROR] Failed to gather results: {str(e)}")
+            return [ReviewAllResult(
+                cv_name="System Error",
+                review=f"Failed to process CVs: {str(e)}",
+                fit_score=0
+            )]
     finally:
         # Ensure the executor is shut down properly
-        executor.shutdown(wait=True)
+        try:
+            executor.shutdown(wait=True)
+        except Exception as e:
+            print(f"[ERROR] Failed to shutdown executor: {str(e)}")
 
 
 def extract_fit_score(review_text: str) -> int:

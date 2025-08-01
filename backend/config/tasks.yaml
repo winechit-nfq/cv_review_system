@@ -1,77 +1,114 @@
-general_cv_review_task:
+technical_architecture_review_task:
   description: >
-    Review the CV of candidate "{cv_name}" to evaluate overall quality, alignment with the job description: "{job_description}", and transferable skills.
-    Consider the content of their CV:
+    Review the CV of candidate "{cv_name}" to evaluate their architectural expertise and system design capabilities against the requirements in: "{job_description}".
+    Analyze their technical experience from the CV:
     ---
     {cv_text}
     ---
-    Assess soft skills, clarity of presentation, adaptability, and any notable accomplishments across industries or roles that relate to the job.
-    Your analysis will be collected and used by the senior technical reviewer for the final assessment.
+    Focus on distributed systems experience, cloud architecture knowledge, scalability solutions, and technical decision-making capabilities.
+    Your architectural assessment will be crucial for the senior technical reviewer's final evaluation.
   expected_output: >
-    A comprehensive summary with 15 bullet points for candidate "{cv_name}":
-    - 8 bullet points highlighting key strengths across general areas such as communication, career progression, and relevance to the job requirements
-    - 4 bullet points identifying specific weaknesses, gaps, or areas of concern
-    - 3 bullet points with actionable recommendations for improvement
-    Include overall candidate profile insights that will inform the final technical evaluation.
-  agent: cv_reviewer_generalist
+    **Final Assessment**:
+    - Candidate Fit Score: [X/100]
+      * Technical Skills: [X/40]
+      * Experience: [X/30]
+      * Role Alignment: [X/30]
+    
+    - Recommendation: [Strong Hire/Hire/Maybe/No Hire]
+      * Confidence Level: [High/Medium/Low]
+      * Risk Level: [Low/Medium/High]
+    
+    - Executive Summary:
+      * Key Strengths: [Top 3 standout qualities]
+      * Growth Areas: [Up to 3 development needs]
+      * Interview Focus: [Key areas to probe]
+      * Cultural Fit: [Team/company culture alignment]
+  agent: technical_architect_agent
 
-ux_designer_cv_review_task:
+engineering_practice_review_task:
   description: >
-    Evaluate the CV of candidate "{cv_name}" and their portfolio (if mentioned) to assess alignment with the design expectations outlined in the job description: "{job_description}".
-    Review the following CV:
+    Evaluate the engineering practices and development methodology expertise of candidate "{cv_name}" based on their CV:
     ---
     {cv_text}
     ---
-    Consider their UX process, user research involvement, interaction design, visual communication, and collaboration practices.
-    Your design-focused insights will be collected and incorporated into the final technical assessment.
+    Analyze their experience with testing strategies, CI/CD implementations, code quality practices, and development process improvements.
+    Compare their engineering practices against the requirements in: "{job_description}".
   expected_output: >
-    A detailed analysis with 15 bullet points for candidate "{cv_name}":
-    - 8 bullet points highlighting strengths in user-centered design, storytelling, creativity, and design process capabilities
-    - 4 bullet points identifying design-related weaknesses, missing elements, or areas where the CV falls short of role expectations
-    - 3 bullet points with specific recommendations on how the CV could better demonstrate their value for the specific role
-    Focus on design capabilities and gaps that will contribute to the overall candidate evaluation.
-  agent: cv_reviewer_ux_designer
+    **Final Assessment**:
+    - Candidate Fit Score: [X/100]
+      * Technical Skills: [X/40]
+      * Experience: [X/30]
+      * Role Alignment: [X/30]
+    
+    - Recommendation: [Strong Hire/Hire/Maybe/No Hire]
+      * Confidence Level: [High/Medium/Low]
+      * Risk Level: [Low/Medium/High]
+    
+    - Executive Summary:
+      * Key Strengths: [Top 3 standout qualities]
+      * Growth Areas: [Up to 3 development needs]
+      * Interview Focus: [Key areas to probe]
+      * Cultural Fit: [Team/company culture alignment]
+  agent: engineering_practice_agent
 
-product_manager_cv_review_task:
+team_leadership_review_task:
   description: >
-    Review the CV of candidate "{cv_name}" to assess their product management skills in the context of the job description: "{job_description}".
-    The CV is provided below:
+    Assess the technical leadership capabilities and team impact of candidate "{cv_name}" based on their CV:
     ---
     {cv_text}
     ---
-    Look for experience in product strategy, delivery, cross-functional collaboration, and business impact.
-    Your strategic assessment will be collected and used by the senior technical reviewer for final evaluation.
+    Evaluate their experience in technical mentorship, team development, and engineering culture building.
+    Consider their alignment with the leadership expectations outlined in: "{job_description}".
   expected_output: >
-    A strategic analysis with 15 bullet points for candidate "{cv_name}":
-    - 8 bullet points highlighting relevant achievements, team leadership, prioritization ability, and communication strengths
-    - 4 bullet points identifying weaknesses in product management experience, strategic thinking gaps, or missing competencies
-    - 3 bullet points with recommendations to improve CV alignment with the role and address identified gaps
-    Provide insights on product thinking strengths and weaknesses that will inform the final assessment.
-  agent: cv_reviewer_product_manager
+    **Final Assessment**:
+    - Candidate Fit Score: [X/100]
+      * Technical Skills: [X/40]
+      * Experience: [X/30]
+      * Role Alignment: [X/30]
+    
+    - Recommendation: [Strong Hire/Hire/Maybe/No Hire]
+      * Confidence Level: [High/Medium/Low]
+      * Risk Level: [Low/Medium/High]
+    
+    - Executive Summary:
+      * Key Strengths: [Top 3 standout qualities]
+      * Growth Areas: [Up to 3 development needs]
+      * Interview Focus: [Key areas to probe]
+      * Cultural Fit: [Team/company culture alignment]
+  agent: team_leadership_agent
 
 software_engineer_cv_review_task:
   description: >
-    Conduct a comprehensive final assessment of candidate "{cv_name}" for the software engineering role described in: "{job_description}".
+    Perform a comprehensive final assessment of candidate "{cv_name}" for the software engineering position described in: "{job_description}".
     
-    First, analyze the CV content for technical expertise:
+    Step 1: Analyze the CV for evidence of technical expertise, including:
     ---
     {cv_text}
     ---
+    - Programming languages, frameworks, and tools proficiency
+    - Project experience and problem-solving capabilities
+    - Architectural thinking and system design skills
     
-    Then, collect and synthesize the assessments from the three specialist reviewers:
-    1. Generalist reviewer's insights on overall candidate profile and transferable skills
-    2. UX designer reviewer's analysis of design thinking and user experience capabilities  
-    3. Product manager reviewer's evaluation of strategic thinking and stakeholder management skills
+    Step 2: Synthesize insights from the three specialist reviewers:
+    1. Technical Architecture reviewer: system design, scalability, and architectural decision-making
+    2. Engineering Practice reviewer: development methodologies, code quality, testing, and CI/CD
+    3. Team Leadership reviewer: technical mentorship, team impact, and engineering culture
     
-    Focus on programming languages, tools, frameworks, project experience, architectural thinking, and problem-solving abilities that match the stated role.
-    Integrate cross-functional insights to provide a holistic evaluation of the candidate's potential for success.
+    Integrate these perspectives to deliver a holistic evaluation of the candidate’s strengths, gaps, and growth potential. Highlight alignment with the role’s requirements and readiness for success.
   expected_output: >
-    A comprehensive final assessment report for "{cv_name}" containing:
     **Final Assessment**:
-    - Candidate Fit Score: [X/100] with detailed justification including both strengths and weaknesses
+    - Candidate Fit Score: [X/100]
+      * Technical Skills: [X/40]
+      * Experience: [X/30]
+      * Role Alignment: [X/30]
+    
     - Recommendation: [Strong Hire/Hire/Maybe/No Hire]
-    - Top 3 strengths for this specific role
-    - Top 3 critical weaknesses or red flags
-    - Top 3 areas for growth or interview focus
-    - Executive summary of why this candidate would/wouldn't succeed in the position, addressing both positive and negative factors
-  agent: cv_reviewer_software_engineer
+      * Confidence Level: [High/Medium/Low]
+      * Risk Level: [Low/Medium/High]
+    
+    - Executive Summary:
+      * Key Strengths: [Top 3 standout qualities]
+      * Growth Areas: [Up to 3 development needs]
+      * Interview Focus: [Key areas to probe]
+      * Cultural Fit: [Team/company culture alignment]
+  agent: software_engineer_agent
