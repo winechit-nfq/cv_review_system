@@ -1,13 +1,18 @@
 // filepath: /Users/nfqlocal/cv_review_system/frontend/main.js
 let currentCVs = [];
 let reviewAllAbortController = null;
+let CV_LIST_FOLDER_NAME = 'cv_list';
+let JOB_DESCRIPTIONS_FOLDER_NAME = 'job_descriptions';
+let QUALIFICATIONS_CV_LIST_FOLDER_NAME = 'qualifications_cv_list';
 
 // Load folders from Google Drive, optionally with a parent folder ID
-async function loadGDriveFolders(parentFolderId = '') {
+// Improved: Load folders from Google Drive, optionally with a parent folder ID
+// Load folders from Google Drive, optionally with a parent folder ID
+async function loadGDriveFolders() {
   const source = document.getElementById('source').value;
   const folderSelectContainer = document.getElementById('folderSelectContainer');
   const folderSelect = document.getElementById('folderSelect');
-  
+
   if (source !== 'gdrive') {
     folderSelectContainer.style.display = 'none';
     return;
@@ -18,32 +23,43 @@ async function loadGDriveFolders(parentFolderId = '') {
   folderSelect.disabled = true;
 
   try {
-    let url = 'http://localhost:8000/gdrive/folders';
-    if (parentFolderId) {
-      url += `?parent_id=${encodeURIComponent(parentFolderId)}`;
-    }
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to load folders');
+    const folders = await fetchGDriveFolders();
 
-    const folders = await res.json();
-    
-    // Sort folders alphabetically
-    folders.sort((a, b) => a.name.localeCompare(b.name));
-    
-    folderSelect.innerHTML = `
-      <option value="">Root Folder</option>
-      ${folders.map(folder => `
-        <option value="${folder.id}">
-          ${folder.name}
-        </option>
-      `).join('')}
-    `;
-    
+    if (!Array.isArray(folders) || folders.length === 0) {
+      folderSelect.innerHTML = '<option value="">No folders found</option>';
+      folderSelect.disabled = true;
+      return;
+    }
+
+    // Sort folders alphabetically, case-insensitive
+    folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+    folderSelect.innerHTML = [
+      '<option value="">Root Folder</option>',
+      ...folders.map(folder =>
+        `<option value="${folder.id}" title="${folder.name}">${folder.name}</option>`
+      )
+    ].join('');
     folderSelect.disabled = false;
   } catch (error) {
-    console.error('Error loading folders:', error);
     folderSelect.innerHTML = '<option value="">Error loading folders</option>';
     folderSelect.disabled = true;
+    folderSelectContainer.insertAdjacentHTML('beforeend', handleError(error, 'Google Drive Folders'));
+  }
+}
+
+// Fetch folders from Google Drive API
+async function fetchGDriveFolders(parentFolderId = '') {
+  let url = 'http://localhost:8000/gdrive/folders';
+  if (parentFolderId) {
+    url += `?parent_id=${encodeURIComponent(parentFolderId)}`;
+  }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load folders');
+    return await res.json();
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -62,14 +78,16 @@ async function loadCVs() {
       <div class="loading-text">Loading CVs from ${source}...</div>
     </div>
   `;
-// Scroll to bottom after loading starts
+  // Scroll to bottom after loading starts
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   // Hide other sections
   hideAllSections();
 
   try {
     const folderId = source === 'gdrive' && folderSelect ? folderSelect.value : '';
-    const url = `http://localhost:8000/cvs?source=${source}${folderId ? `&folder_id=${folderId}` : ''}`;
+    const folders = await fetchGDriveFolders(folderId);
+    const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
+    const url = `http://localhost:8000/cvs?source=${source}${cvFolderId ? `&folder_id=${cvFolderId}` : ''}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load CVs');
 
@@ -121,7 +139,6 @@ async function loadCVs() {
       </div>
     `;
   }
-
   
 }
 
