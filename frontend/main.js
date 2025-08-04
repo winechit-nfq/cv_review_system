@@ -455,17 +455,21 @@ document.addEventListener('DOMContentLoaded', function () {
       
       // Load both job description and CVs in parallel
       try {
-        const [folders] = await Promise.all([
-          fetchGDriveFolders(folderId),
-        ]);
-        
-        const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
-        const jobDescriptionFolderId = folders.find(folder => folder.name === JOB_DESCRIPTIONS_FOLDER_NAME)?.id || '';
+        // Fetch subfolders and load CVs & job description in parallel
+        const folders = await fetchGDriveFolders(folderId);
 
-        loadCVs(cvFolderId);
-        loadJobDescription(jobDescriptionFolderId);
+        // Find relevant subfolder IDs
+        const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
+        const jobDescFolderId = folders.find(folder => folder.name === JOB_DESCRIPTIONS_FOLDER_NAME)?.id || '';
+
+        // Load CVs and job description concurrently
+        await Promise.all([
+          loadJobDescription(jobDescFolderId),
+          loadCVs(cvFolderId)
+        ]);
       } catch (error) {
         console.error('Error loading folder contents:', error);
+        document.getElementById('cvList').innerHTML = handleError(error, 'Folder Contents');
       }
     }
   });
