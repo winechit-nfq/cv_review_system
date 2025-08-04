@@ -2,7 +2,7 @@
 let currentCVs = [];
 let reviewAllAbortController = null;
 let CV_LIST_FOLDER_NAME = 'cv_list';
-let JOB_DESCRIPTIONS_FOLDER_NAME = 'job_descriptions';
+let JOB_DESCRIPTIONS_FOLDER_NAME = 'job_description';
 let QUALIFICATIONS_CV_LIST_FOLDER_NAME = 'qualifications_cv_list';
 
 // Load folders from Google Drive
@@ -415,11 +415,14 @@ function hideAllSections() {
   document.getElementById('allReviewsBox').style.display = 'none';
 }
 
-// Load job description from server
-async function loadJobDescription() {
+// Load job description from server based on selected folder
+async function loadJobDescription(folderId = '') {
   const jobDescTextarea = document.getElementById('jobDescription');
+  jobDescTextarea.value = 'Loading job description...';
+  
   try {
-    const res = await fetch('http://localhost:8000/job_description');
+    const url = `http://localhost:8000/job_description${folderId ? `?folder_id=${folderId}` : ''}`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load job description');
     const text = await res.text();
     jobDescTextarea.value = text;
@@ -434,6 +437,8 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('folderSelect').addEventListener('change', async function () {
     if (this.value !== undefined) {
       // Show container and loading state
+      const cvListContainer = document.getElementById('cvListContainer');
+      const cvList = document.getElementById('cvList');
       cvListContainer.style.display = 'block';
       cvList.innerHTML = `
          <div class="loading-container">
@@ -445,11 +450,23 @@ document.addEventListener('DOMContentLoaded', function () {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
       // Hide other sections
       hideAllSections();
-      const folderSelect = document.getElementById('folderSelect');
-      const folderId = folderSelect.value;
-      const folders = await fetchGDriveFolders(folderId);
-      const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
-      loadCVs(cvFolderId);
+      
+      const folderId = this.value;
+      
+      // Load both job description and CVs in parallel
+      try {
+        const [folders] = await Promise.all([
+          fetchGDriveFolders(folderId),
+        ]);
+        
+        const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
+        const jobDescriptionFolderId = folders.find(folder => folder.name === JOB_DESCRIPTIONS_FOLDER_NAME)?.id || '';
+
+        loadCVs(cvFolderId);
+        loadJobDescription(jobDescriptionFolderId);
+      } catch (error) {
+        console.error('Error loading folder contents:', error);
+      }
     }
   });
 

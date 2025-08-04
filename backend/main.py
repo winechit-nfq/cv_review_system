@@ -434,29 +434,15 @@ def extract_fit_score(review_text: str) -> int:
     return 0
 
 
-def get_job_description_from_drive():
-    """Get job description from a file in Google Drive."""
-    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    job_desc_file_id = os.getenv("GOOGLE_DRIVE_JOB_DESC_ID")
-    if not creds_json or not job_desc_file_id:
-        return "No job description file configured"
-    
-    if creds_json.strip().startswith('{'):
-        creds_dict = json.loads(creds_json)
-    else:
-        with open(creds_json) as f:
-            creds_dict = json.load(f)
-    
-    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
-    service = build('drive', 'v3', credentials=creds)
-    
+def get_file_content(service, file_id):
+    """Helper function to get the content of a file from Google Drive."""
     try:
         # Get file metadata to check its type
-        file = service.files().get(fileId=job_desc_file_id, fields="mimeType, name").execute()
+        file = service.files().get(fileId=file_id, fields="mimeType, name").execute()
         mime_type = file.get('mimeType', '')
         
         # Get the file content
-        data = service.files().get_media(fileId=job_desc_file_id).execute()
+        data = service.files().get_media(fileId=file_id).execute()
         
         if mime_type == 'application/pdf':
             # Handle PDF files
@@ -465,7 +451,7 @@ def get_job_description_from_drive():
         elif mime_type == 'application/vnd.google-apps.document':
             # For Google Docs, use the export method
             data = service.files().export(
-                fileId=job_desc_file_id,
+                fileId=file_id,
                 mimeType='text/plain'
             ).execute()
             return data.decode('utf-8') if isinstance(data, bytes) else str(data)
@@ -473,30 +459,71 @@ def get_job_description_from_drive():
         else:
             # For regular text files
             if isinstance(data, bytes):
-                # Try different encodings in order of likelihood
+                # Try different encodings
                 encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
                 for encoding in encodings:
                     try:
                         return data.decode(encoding)
                     except UnicodeDecodeError:
                         continue
-                
-                # If all encodings fail, try to decode ignoring errors
                 return data.decode('utf-8', errors='ignore')
-            
             return str(data)
             
     except Exception as e:
-        print(f"Error reading job description: {e}")
-        return f"Error reading job description: {str(e)}"
+        raise Exception(f"Error reading file: {str(e)}")
+
+def get_job_description_from_drive(folder_id=None):
+    """Get job description from a file in Google Drive."""
+    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+    if not creds_json:
+        return "No Google Drive credentials configured"
+    
+    if creds_json.strip().startswith('{'):
+        creds_dict = json.loads(creds_json)
+    else:
+        with open(creds_json) as f:
+            creds_dict = json.load(f)
+            
+    creds = service_account.Credentials.from_service_account_info(
+        creds_dict, 
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    service = build('drive', 'v3', credentials=creds)
+
+    try:
+        if folder_id:
+        
+            results = service.files().list(
+                q=f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document') and trashed=false",
+                fields="files(id, name, mimeType)",
+                pageSize=1,  # We only need the first matching file
+                orderBy="createdTime desc"  # Get the most recent file if multiple exist
+            ).execute()
+
+            files = results.get('files', [])
+            if not files:
+                return "No job description file found in the selected folder"
+
+            # Use the first matching file
+            file_id = files[0]['id']
+            print(f"[INFO] Found job description file: {files[0]['name']}")
+            return get_file_content(service, file_id)
+        else:
+            # Use default job description file if no folder specified
+            job_desc_file_id = os.getenv("GOOGLE_DRIVE_JOB_DESC_ID")
+            if not job_desc_file_id:
+                return "No default job description file configured"
+            return get_file_content(service, job_desc_file_id)
+
     except Exception as e:
-        print(f"Error reading job description: {e}")
-        return f"Error reading job description: {str(e)}"
+        error_msg = f"Error reading job description: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
 
 @app.get("/job_description", response_class=PlainTextResponse)
-def get_job_description():
+def get_job_description(folder_id: Optional[str] = None):
     """Endpoint to get the job description from Google Drive."""
-    return get_job_description_from_drive()
+    return get_job_description_from_drive(folder_id)
 
 @app.get("/cv_content", response_class=PlainTextResponse)
 def get_cv_content(source: str, path: str):
