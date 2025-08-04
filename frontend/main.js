@@ -25,9 +25,9 @@ async function loadGDriveFolders() {
     folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
     folderSelect.innerHTML = [
-      '<option value="">Root Folder</option>',
+      '<option value="">Select an open position...</option>',
       ...folders.map(folder =>
-        `<option value="${folder.id}" title="${folder.name}">${folder.name}</option>`
+      `<option value="${folder.id}" title="${folder.name}">${folder.name}</option>`
       )
     ].join('');
     folderSelect.disabled = false;
@@ -436,7 +436,7 @@ async function loadJobDescription(folderId = '') {
 document.addEventListener('DOMContentLoaded', function () {
   // Add folder change event listener
   document.getElementById('folderSelect').addEventListener('change', async function () {
-    if (this.value !== undefined) {
+    if (this.value !== '') {
       // Show container and loading state
       const cvListContainer = document.getElementById('cvListContainer');
       const cvList = document.getElementById('cvList');
@@ -472,6 +472,11 @@ document.addEventListener('DOMContentLoaded', function () {
         console.error('Error loading folder contents:', error);
         document.getElementById('cvList').innerHTML = handleError(error, 'Folder Contents');
       }
+    } else {
+      // Hide CV list container and reset job description
+      document.getElementById('cvListContainer').style.display = 'none';
+      document.getElementById('jobDescription').value = '';
+      hideAllSections();
     }
   });
 
