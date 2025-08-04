@@ -5,20 +5,9 @@ let CV_LIST_FOLDER_NAME = 'cv_list';
 let JOB_DESCRIPTIONS_FOLDER_NAME = 'job_descriptions';
 let QUALIFICATIONS_CV_LIST_FOLDER_NAME = 'qualifications_cv_list';
 
-// Load folders from Google Drive, optionally with a parent folder ID
-// Improved: Load folders from Google Drive, optionally with a parent folder ID
-// Load folders from Google Drive, optionally with a parent folder ID
+// Load folders from Google Drive
 async function loadGDriveFolders() {
-  const source = document.getElementById('source').value;
-  const folderSelectContainer = document.getElementById('folderSelectContainer');
   const folderSelect = document.getElementById('folderSelect');
-
-  if (source !== 'gdrive') {
-    folderSelectContainer.style.display = 'none';
-    return;
-  }
-
-  folderSelectContainer.style.display = 'block';
   folderSelect.innerHTML = '<option value="">Loading folders...</option>';
   folderSelect.disabled = true;
 
@@ -63,9 +52,8 @@ async function fetchGDriveFolders(parentFolderId = '') {
   }
 }
 
-// Load CVs from selected source
+// Load CVs from Google Drive
 async function loadCVs() {
-  const source = document.getElementById('source').value;
   const folderSelect = document.getElementById('folderSelect');
   const cvListContainer = document.getElementById('cvListContainer');
   const cvList = document.getElementById('cvList');
@@ -75,7 +63,7 @@ async function loadCVs() {
   cvList.innerHTML = `
     <div class="loading-container">
       <div class="spinner"></div>
-      <div class="loading-text">Loading CVs from ${source}...</div>
+      <div class="loading-text">Loading CVs...</div>
     </div>
   `;
   // Scroll to bottom after loading starts
@@ -84,10 +72,10 @@ async function loadCVs() {
   hideAllSections();
 
   try {
-    const folderId = source === 'gdrive' && folderSelect ? folderSelect.value : '';
+    const folderId = folderSelect.value;
     const folders = await fetchGDriveFolders(folderId);
     const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
-    const url = `http://localhost:8000/cvs?source=${source}${cvFolderId ? `&folder_id=${cvFolderId}` : ''}`;
+    const url = `http://localhost:8000/cvs?source=gdrive${cvFolderId ? `&folder_id=${cvFolderId}` : ''}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load CVs');
 
@@ -225,7 +213,6 @@ async function previewCV(cv) {
 
 // Review all CVs
 async function reviewAllCVs() {
-  const source = document.getElementById('source').value;
   const jobDescription = document.getElementById('jobDescription').value;
   const allReviewsBox = document.getElementById('allReviewsBox');
   const reviewAllBtn = document.getElementById('reviewAllBtn');
@@ -253,7 +240,7 @@ async function reviewAllCVs() {
   reviewAllAbortController = new AbortController();
 
   try {
-    const res = await fetch(`http://localhost:8000/review_all?source=${source}`, {
+    const res = await fetch(`http://localhost:8000/review_all?source=gdrive`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(jobDescription),
@@ -412,7 +399,7 @@ function findCVData(cvName, cvPath) {
   return {
     name: cvName,
     path: cvPath || cvName,
-    source: document.getElementById('source').value
+    source: 'gdrive'
   };
 }
 
@@ -459,29 +446,6 @@ async function loadJobDescription() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
-  // Add source change event listener
-  document.getElementById('source').addEventListener('change', async function() {
-    const folderSelectContainer = document.getElementById('folderSelectContainer');
-    const folderSelect = document.getElementById('folderSelect');
-    
-    // Reset the CV list when source changes
-    const cvListContainer = document.getElementById('cvListContainer');
-    cvListContainer.style.display = 'none';
-    
-    // Clear any existing reviews
-    hideAllSections();
-    
-    if (this.value === 'gdrive') {
-      // Load folders for Google Drive
-      await loadGDriveFolders();
-    } else {
-      // Hide folder selection for GitHub
-      folderSelectContainer.style.display = 'none';
-      // Load CVs immediately for GitHub
-      loadCVs();
-    }
-  });
-
   // Add folder change event listener
   document.getElementById('folderSelect').addEventListener('change', function() {
     if (this.value !== undefined) {
@@ -489,10 +453,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Initial load of folders if Google Drive is selected
-  if (document.getElementById('source').value === 'gdrive') {
-    loadGDriveFolders();
-  }
+  // Initial load of folders
+  loadGDriveFolders();
 
   const formControls = document.querySelectorAll('.form-control');
   formControls.forEach(control => {
