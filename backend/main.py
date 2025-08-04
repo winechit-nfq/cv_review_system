@@ -507,11 +507,7 @@ def get_job_description_from_drive(folder_id=None):
             print(f"[INFO] Found job description file: {files[0]['name']}")
             return get_file_content(service, file_id)
         else:
-            # Use default job description file if no folder specified
-            job_desc_file_id = os.getenv("GOOGLE_DRIVE_JOB_DESC_ID")
-            if not job_desc_file_id:
-                return "No default job description file configured"
-            return get_file_content(service, job_desc_file_id)
+            return 'No folder ID provided. No job description file found in the selected folder.'
 
     except Exception as e:
         error_msg = f"Error reading job description: {str(e)}"
