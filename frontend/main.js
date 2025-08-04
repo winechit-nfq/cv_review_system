@@ -1,5 +1,6 @@
 // filepath: /Users/nfqlocal/cv_review_system/frontend/main.js
 let currentCVs = [];
+let qualifiedFolderId = '';
 let reviewAllAbortController = null;
 let CV_LIST_FOLDER_NAME = 'cv_list';
 let JOB_DESCRIPTIONS_FOLDER_NAME = 'job_description';
@@ -227,7 +228,7 @@ async function reviewAllCVs() {
     const res = await fetch(`http://localhost:8000/review_all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_description: jobDescription, cvs: currentCVs }),
+      body: JSON.stringify({ job_description: jobDescription, cvs: currentCVs, qualified_folder_id: qualifiedFolderId }),
       signal: reviewAllAbortController.signal
     });
 
@@ -461,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Find relevant subfolder IDs
         const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
         const jobDescFolderId = folders.find(folder => folder.name === JOB_DESCRIPTIONS_FOLDER_NAME)?.id || '';
-
+        qualifiedFolderId = folders.find(folder => folder.name === QUALIFICATIONS_CV_LIST_FOLDER_NAME)?.id || '';
         // Load CVs and job description concurrently
         await Promise.all([
           loadJobDescription(jobDescFolderId),

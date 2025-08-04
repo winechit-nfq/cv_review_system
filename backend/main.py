@@ -108,11 +108,10 @@ def list_github_cvs():
             cv_files.append(CVInfo(name=f.name, source="github", path=f.path))
     return cv_files
 
-def move_to_qualified_folder(file_id: str) -> bool:
+def move_to_qualified_folder(file_id: str, qualified_folder_id: str) -> bool:
     """Move the file to the qualified candidates folder in Google Drive."""
     try:
         creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-        qualified_folder_id = os.getenv("GOOGLE_DRIVE_QUALIFIED_FOLDER_ID")
         
         if not creds_json or not qualified_folder_id:
             print("[ERROR] Google Drive credentials or qualified folder ID not set")
@@ -250,7 +249,8 @@ def review_cv(cv: CVInfo):
 @app.post("/review_all", response_model=List[ReviewAllResult])
 async def review_all_cvs(
     cvs: List[CVInfo],
-    job_description: Optional[str] = Body(None)
+    job_description: Optional[str] = Body(None),
+    qualified_folder_id: Optional[str] = Body(None)
 ):
 
     # Create a single ThreadPoolExecutor for all tasks
@@ -305,7 +305,8 @@ async def review_all_cvs(
                     moved_to_qualified = await loop.run_in_executor(
                         executor,
                         move_to_qualified_folder,
-                        cv.path
+                        cv.path,
+                        qualified_folder_id
                     )
                     if moved_to_qualified:
                         print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
