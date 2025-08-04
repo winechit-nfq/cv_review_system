@@ -44,9 +44,37 @@ class ReviewAllResult(BaseModel):
     review: str
     fit_score: int
 
-def list_gdrive_cvs():
+def list_gdrive_folders(parent_id: str = None):
     creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+    root_folder_id = parent_id if parent_id is not None else os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+    if not creds_json or not root_folder_id:
+        return []
+    
+    if creds_json.strip().startswith('{'):
+        creds_dict = json.loads(creds_json)
+    else:
+        with open(creds_json) as f:
+            creds_dict = json.load(f)
+    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
+    service = build('drive', 'v3', credentials=creds)
+
+    try:
+        # Query for folders within the root folder
+        results = service.files().list(
+            q=f"'{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            fields="files(id, name)",
+            pageSize=50
+        ).execute()
+        folders = results.get('files', [])
+        return [{"id": folder["id"], "name": folder["name"]} for folder in folders]
+    except Exception as e:
+        print(f"Error listing folders: {e}")
+        return []
+
+def list_gdrive_cvs(folder_id=None):
+    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+    if not folder_id:
+        folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
     if not creds_json or not folder_id:
         return []
     
@@ -193,10 +221,14 @@ def run_gemini_review(cv_text, cv_name, job_description=None):
     result = CrewAI().crew().kickoff(inputs=inputs)
     return result
 
+@app.get("/gdrive/folders")
+def get_gdrive_folders(parent_id: Optional[str] = None):
+    return list_gdrive_folders(parent_id=parent_id)
+
 @app.get("/cvs", response_model=List[CVInfo])
-def list_cvs(source: str = Query(..., regex="^(gdrive|github)$")):
+def list_cvs(source: str = Query(..., regex="^(gdrive|github)$"), folder_id: Optional[str] = None):
     if source == 'gdrive':
-        return list_gdrive_cvs()
+        return list_gdrive_cvs(folder_id)
     else:
         return list_github_cvs()
 
