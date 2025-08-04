@@ -249,12 +249,9 @@ def review_cv(cv: CVInfo):
 
 @app.post("/review_all", response_model=List[ReviewAllResult])
 async def review_all_cvs(
-    source: str = Query(..., regex="^(gdrive|github)$"),
+    cvs: List[CVInfo],
     job_description: Optional[str] = Body(None)
 ):
-    # Step 1: List all CVs based on source
-    cvs = list_gdrive_cvs() if source == 'gdrive' else list_github_cvs()
-    results = []
 
     # Create a single ThreadPoolExecutor for all tasks
     executor = ThreadPoolExecutor(max_workers=min(32, len(cvs) + 4))

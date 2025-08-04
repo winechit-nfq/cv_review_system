@@ -3,7 +3,7 @@ let currentCVs = [];
 let reviewAllAbortController = null;
 let CV_LIST_FOLDER_NAME = 'cv_list';
 let JOB_DESCRIPTIONS_FOLDER_NAME = 'job_description';
-let QUALIFICATIONS_CV_LIST_FOLDER_NAME = 'qualifications_cv_list';
+let QUALIFICATIONS_CV_LIST_FOLDER_NAME = 'qualified_cv_list';
 
 // Load folders from Google Drive
 async function loadGDriveFolders() {
@@ -224,10 +224,10 @@ async function reviewAllCVs() {
   reviewAllAbortController = new AbortController();
 
   try {
-    const res = await fetch(`http://localhost:8000/review_all?source=gdrive`, {
+    const res = await fetch(`http://localhost:8000/review_all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(jobDescription),
+      body: JSON.stringify({ job_description: jobDescription, cvs: currentCVs }),
       signal: reviewAllAbortController.signal
     });
 
