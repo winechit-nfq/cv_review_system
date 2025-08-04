@@ -53,29 +53,13 @@ async function fetchGDriveFolders(parentFolderId = '') {
 }
 
 // Load CVs from Google Drive
-async function loadCVs() {
-  const folderSelect = document.getElementById('folderSelect');
+async function loadCVs(folderId = '') {
   const cvListContainer = document.getElementById('cvListContainer');
   const cvList = document.getElementById('cvList');
 
-  // Show container and loading state
-  cvListContainer.style.display = 'block';
-  cvList.innerHTML = `
-    <div class="loading-container">
-      <div class="spinner"></div>
-      <div class="loading-text">Loading CVs...</div>
-    </div>
-  `;
-  // Scroll to bottom after loading starts
-  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  // Hide other sections
-  hideAllSections();
-
   try {
-    const folderId = folderSelect.value;
-    const folders = await fetchGDriveFolders(folderId);
-    const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
-    const url = `http://localhost:8000/cvs?source=gdrive${cvFolderId ? `&folder_id=${cvFolderId}` : ''}`;
+
+    const url = `http://localhost:8000/cvs?source=gdrive${folderId ? `&folder_id=${folderId}` : ''}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load CVs');
 
@@ -127,7 +111,7 @@ async function loadCVs() {
       </div>
     `;
   }
-  
+
 }
 
 // Extract owner name from CV filename or path
@@ -234,7 +218,7 @@ async function reviewAllCVs() {
   `;
   // Scroll to top of the review box
   allReviewsBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  
+
   reviewAllBtn.disabled = true;
   stopBtn.style.display = 'inline-flex';
   reviewAllAbortController = new AbortController();
@@ -336,10 +320,10 @@ function renderResults(results) {
           </thead>
           <tbody>
             ${results.map((result, index) => {
-              const ownerName = extractOwnerName(result.cv_name, result.cv_path || '');
-              const cvData = findCVData(result.cv_name, result.cv_path);
+    const ownerName = extractOwnerName(result.cv_name, result.cv_path || '');
+    const cvData = findCVData(result.cv_name, result.cv_path);
 
-              return `
+    return `
                 <tr>
                   <td class="rank-cell ${getRankClass(index + 1)}">
                     ${getRankIcon(index + 1)} ${index + 1}
@@ -372,7 +356,7 @@ function renderResults(results) {
                   </td>
                 </tr>
               `;
-            }).join('')}
+  }).join('')}
           </tbody>
         </table>
       </div>
@@ -445,11 +429,27 @@ async function loadJobDescription() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   // Add folder change event listener
-  document.getElementById('folderSelect').addEventListener('change', function() {
+  document.getElementById('folderSelect').addEventListener('change', async function () {
     if (this.value !== undefined) {
-      loadCVs();
+      // Show container and loading state
+      cvListContainer.style.display = 'block';
+      cvList.innerHTML = `
+         <div class="loading-container">
+         <div class="spinner"></div>
+         <div class="loading-text">Loading CVs...</div>
+         </div>
+     `;
+      // Scroll to bottom after loading starts
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      // Hide other sections
+      hideAllSections();
+      const folderSelect = document.getElementById('folderSelect');
+      const folderId = folderSelect.value;
+      const folders = await fetchGDriveFolders(folderId);
+      const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
+      loadCVs(cvFolderId);
     }
   });
 
@@ -458,39 +458,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const formControls = document.querySelectorAll('.form-control');
   formControls.forEach(control => {
-    control.addEventListener('focus', function() {
+    control.addEventListener('focus', function () {
       this.parentElement.style.transform = 'translateY(-2px)';
     });
-    control.addEventListener('blur', function() {
+    control.addEventListener('blur', function () {
       this.parentElement.style.transform = 'translateY(0)';
     });
   });
 
   const jobDescTextarea = document.getElementById('jobDescription');
   let saveTimeout;
-  jobDescTextarea.addEventListener('input', function() {
+  jobDescTextarea.addEventListener('input', function () {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
       console.log('Job description updated');
     }, 1000);
   });
 
-  document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey || e.metaKey) {
-      switch(e.key) {
-        case 'l':
-          e.preventDefault();
-          loadCVs();
-          break;
-        case 'r':
-          e.preventDefault();
-          if (currentCVs.length > 0) {
-            reviewAllCVs();
-          }
-          break;
-      }
-    }
-  });
+
 
   const tooltips = {
     'source': 'Choose where your CV files are stored',
@@ -594,7 +579,7 @@ function convertToCSV(results) {
   return [headers, ...rows].map(row => row.join(',')).join('\n');
 }
 
-document.getElementById('darkModeToggle').onclick = function() {
+document.getElementById('darkModeToggle').onclick = function () {
   document.body.classList.toggle('dark-mode');
   this.innerHTML = document.body.classList.contains('dark-mode')
     ? '<i class="fas fa-sun"></i>'
