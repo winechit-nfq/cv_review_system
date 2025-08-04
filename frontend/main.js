@@ -306,6 +306,18 @@ function renderResults(results) {
             <i class="fas fa-chart-line"></i>
             <span>Avg: <strong>${avgScore}</strong></span>
           </div>
+          <div class="summary-item">
+            <i class="fas fa-microchip"></i>
+            <span>Total Tokens: <strong>${results.reduce((sum, r) => sum + r.total_tokens, 0).toLocaleString()}</strong></span>
+          </div>
+          <div class="summary-item">
+            <i class="fas fa-arrow-right"></i>
+            <span>Prompt: <strong>${results.reduce((sum, r) => sum + r.prompt_tokens, 0).toLocaleString()}</strong></span>
+          </div>
+          <div class="summary-item">
+            <i class="fas fa-arrow-left"></i>
+            <span>Completion: <strong>${results.reduce((sum, r) => sum + r.completion_tokens, 0).toLocaleString()}</strong></span>
+          </div>
         </div>
       </div>
       <div class="table-wrapper">
@@ -343,6 +355,15 @@ function renderResults(results) {
                     <span class="score-badge ${getScoreClass(result.fit_score)}">
                       ${result.fit_score}
                     </span>
+                    <div class="token-usage">
+                      <small class="token-count" title="Total tokens">
+                        <i class="fas fa-microchip"></i> Total: ${result.total_tokens.toLocaleString()}
+                      </small>
+                      <small class="token-details">
+                        <span title="Prompt tokens"><i class="fas fa-arrow-right"></i> ${result.prompt_tokens.toLocaleString()}</span>
+                        <span title="Completion tokens"><i class="fas fa-arrow-left"></i> ${result.completion_tokens.toLocaleString()}</span>
+                      </small>
+                    </div>
                   </td>
                   <td class="actions-cell">
                     <div class="action-buttons">

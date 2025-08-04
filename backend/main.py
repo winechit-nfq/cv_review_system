@@ -43,6 +43,10 @@ class ReviewAllResult(BaseModel):
     cv_name: str
     review: str
     fit_score: int
+    token_count: Optional[int] = 0
+    prompt_tokens: Optional[int] = 0
+    completion_tokens: Optional[int] = 0
+    total_tokens: Optional[int] = 0
 
 def list_gdrive_folders(parent_id: str = None):
     creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
@@ -271,7 +275,11 @@ async def review_all_cvs(
                 return ReviewAllResult(
                     cv_name=cv.name,
                     review=f"Error getting CV content: {str(e)}",
-                    fit_score=0
+                    fit_score=0,
+                    token_count=0,
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0
                 )
 
             # Step 3: Run Gemini/CrewAI review
@@ -284,12 +292,28 @@ async def review_all_cvs(
                     job_description
                 )
                 review = review_output.raw if hasattr(review_output, "raw") else str(review_output)
+                # Get token usage from review_output
+                token_usage = getattr(review_output, "token_usage", None)
+                if token_usage and hasattr(token_usage, "prompt_tokens"):
+                    prompt_tokens = token_usage.prompt_tokens
+                    completion_tokens = token_usage.completion_tokens
+                    total_tokens = token_usage.total_tokens
+                else:
+                    # Fallback to estimating tokens if exact count not available
+                    total_tokens = len(review.split()) * 2  # Rough estimate
+                    prompt_tokens = len(cv_text.split())  # Rough estimate for input
+                    completion_tokens = total_tokens - prompt_tokens
+                token_count = total_tokens
             except Exception as e:
                 print(f"[ERROR] Failed to review CV {cv.name}: {str(e)}")
                 return ReviewAllResult(
                     cv_name=cv.name,
                     review=f"Error during CV review: {str(e)}",
-                    fit_score=0
+                    fit_score=0,
+                    token_count=0,
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0
                 )
 
             # Step 4: Extract fit score with improved regex and parsing
@@ -317,7 +341,11 @@ async def review_all_cvs(
             return ReviewAllResult(
                 cv_name=cv.name,
                 review=f"{review}\n\n{'[Moved to qualified folder]' if moved_to_qualified else ''}",
-                fit_score=fit_score
+                fit_score=fit_score,
+                token_count=token_count,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens
             )
 
         except Exception as e:
