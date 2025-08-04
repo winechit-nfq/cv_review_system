@@ -33,7 +33,7 @@
           <i class="fas fa-cog"></i>
           Configuration
         </h2>
-        <p class="card-subtitle">Select your CV source and provide job description</p>
+        <p class="card-subtitle">Select your CV source and view job requirements</p>
       </div>
       <div class="card-body">
         <div class="form-group">
@@ -56,13 +56,14 @@
         <div class="form-group">
           <label for="jobDescription" class="form-label">
             <i class="fas fa-briefcase"></i>
-            Job Description
+            Job Description (from Google Drive)
           </label>
           <textarea 
             id="jobDescription" 
-            class="form-control" 
-            placeholder="Paste the complete job description here to enable AI-powered matching and ranking..."
-            rows="6"
+            class="form-control job-description-textarea" 
+            readonly
+            placeholder="Loading job description from Google Drive..."
+            rows="12"
           ></textarea>
         </div>
 

@@ -14,6 +14,8 @@ import json
 from backend.crew import CrewAI
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import io
+from pdfminer.high_level import extract_text
 
 app = FastAPI()
 
@@ -399,6 +401,70 @@ def extract_fit_score(review_text: str) -> int:
     print(f"[WARN] No fit score found in review text: {review_text[:200]}...")
     return 0
 
+
+def get_job_description_from_drive():
+    """Get job description from a file in Google Drive."""
+    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+    job_desc_file_id = os.getenv("GOOGLE_DRIVE_JOB_DESC_ID")
+    if not creds_json or not job_desc_file_id:
+        return "No job description file configured"
+    
+    if creds_json.strip().startswith('{'):
+        creds_dict = json.loads(creds_json)
+    else:
+        with open(creds_json) as f:
+            creds_dict = json.load(f)
+    
+    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
+    service = build('drive', 'v3', credentials=creds)
+    
+    try:
+        # Get file metadata to check its type
+        file = service.files().get(fileId=job_desc_file_id, fields="mimeType, name").execute()
+        mime_type = file.get('mimeType', '')
+        
+        # Get the file content
+        data = service.files().get_media(fileId=job_desc_file_id).execute()
+        
+        if mime_type == 'application/pdf':
+            # Handle PDF files
+            return extract_text(io.BytesIO(data))
+            
+        elif mime_type == 'application/vnd.google-apps.document':
+            # For Google Docs, use the export method
+            data = service.files().export(
+                fileId=job_desc_file_id,
+                mimeType='text/plain'
+            ).execute()
+            return data.decode('utf-8') if isinstance(data, bytes) else str(data)
+            
+        else:
+            # For regular text files
+            if isinstance(data, bytes):
+                # Try different encodings in order of likelihood
+                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+                for encoding in encodings:
+                    try:
+                        return data.decode(encoding)
+                    except UnicodeDecodeError:
+                        continue
+                
+                # If all encodings fail, try to decode ignoring errors
+                return data.decode('utf-8', errors='ignore')
+            
+            return str(data)
+            
+    except Exception as e:
+        print(f"Error reading job description: {e}")
+        return f"Error reading job description: {str(e)}"
+    except Exception as e:
+        print(f"Error reading job description: {e}")
+        return f"Error reading job description: {str(e)}"
+
+@app.get("/job_description", response_class=PlainTextResponse)
+def get_job_description():
+    """Endpoint to get the job description from Google Drive."""
+    return get_job_description_from_drive()
 
 @app.get("/cv_content", response_class=PlainTextResponse)
 def get_cv_content(source: str, path: str):

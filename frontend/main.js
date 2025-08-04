@@ -379,8 +379,24 @@ function hideAllSections() {
   document.getElementById('allReviewsBox').style.display = 'none';
 }
 
+// Load job description from server
+async function loadJobDescription() {
+  const jobDescTextarea = document.getElementById('jobDescription');
+  try {
+    const res = await fetch('http://localhost:8000/job_description');
+    if (!res.ok) throw new Error('Failed to load job description');
+    const text = await res.text();
+    jobDescTextarea.value = text;
+  } catch (error) {
+    jobDescTextarea.value = 'Error loading job description: ' + error.message;
+  }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
+  // Load job description when page loads
+  loadJobDescription();
+
   const formControls = document.querySelectorAll('.form-control');
   formControls.forEach(control => {
     control.addEventListener('focus', function() {

@@ -138,18 +138,26 @@
       font-size: 0.9rem;
     }
 
-    .form-control {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border: 2px solid var(--border);
-      border-radius: var(--radius);
-      font-size: 0.9rem;
-      transition: all 0.2s ease;
-      background: var(--surface);
-      color: var(--text-primary);
-    }
+.form-control {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease-in-out;
+}
 
-    .form-control:focus {
+.job-description-textarea {
+  min-height: 300px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  background-color: var(--background) !important;
+}    .form-control:focus {
       outline: none;
       border-color: var(--primary);
       background: 0 0 0 3px rgba(255, 107, 0, 0.1);
