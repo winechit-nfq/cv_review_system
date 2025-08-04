@@ -60,6 +60,22 @@
           ></textarea>
         </div>
 
+        <!-- CV List -->
+        <div id="cvListContainer">
+          <div class="card fade-in">
+            <div class="card-header">
+              <h2 class="card-title">
+                <i class="fas fa-users"></i>
+                Available CVs
+              </h2>
+              <p class="card-subtitle">CVs loaded and ready for review</p>
+            </div>
+            <div class="card-body">
+              <div id="cvList" class="cv-grid"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="btn-group">
           <button id="reviewAllBtn" onclick="reviewAllCVs()" class="btn btn-primary">
             <i class="fas fa-robot"></i>
@@ -69,22 +85,6 @@
             <i class="fas fa-stop"></i>
             Stop Review
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- CV List -->
-    <div id="cvListContainer" style="display:none;">
-      <div class="card fade-in">
-        <div class="card-header">
-          <h2 class="card-title">
-            <i class="fas fa-users"></i>
-            Available CVs
-          </h2>
-          <p class="card-subtitle">CVs loaded and ready for review</p>
-        </div>
-        <div class="card-body">
-          <div id="cvList" class="cv-grid"></div>
         </div>
       </div>
     </div>
