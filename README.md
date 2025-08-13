@@ -1,7 +1,7 @@
 
 # 🤖 CV Review System
 
-An intelligent CV analysis platform that revolutionizes HR recruitment. Powered by Google's Gemini API, it provides automated CV review, smart candidate ranking, and seamless integration with popular document sources.
+An intelligent CV analysis platform that revolutionizes HR recruitment. Powered by OpenAI's GPT models, it provides automated CV review, smart candidate ranking, and seamless integration with popular document sources.
 
 ## ✨ Key Features
 
@@ -57,7 +57,7 @@ An intelligent CV analysis platform that revolutionizes HR recruitment. Powered 
 ### Software Prerequisites
 - Python 3.8 or higher
 - Modern web browser (Chrome 90+, Firefox 90+, Safari 15+)
-- Google Cloud account (for API access)
+- OpenAI account (for API access)
 - GitHub account (optional)
 
 ## 🚀 Installation Guide
@@ -109,8 +109,8 @@ pip install python-dotenv  # for environment management
 
 2. Add your credentials:
    ```env
-   # Required: Gemini API credentials
-   GEMINI_API_KEY=your_gemini_api_key
+   # Required: OpenAI API credentials
+   OPENAI_API_KEY=your_openai_api_key
 
    # For Google Drive integration
    GOOGLE_DRIVE_CREDENTIALS=path/to/credentials.json  # or JSON string
@@ -191,6 +191,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Built with CrewAI and Gemini API
+- Built with CrewAI and OpenAI API
 - Frontend uses modern web technologies
 - Special thanks to all contributors
