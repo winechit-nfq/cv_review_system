@@ -211,6 +211,19 @@ def get_github_cv_content(path):
         return '\n'.join([p.text for p in doc.paragraphs])
     return "Unsupported file type"
 
+def run_openai_review(cv_text, cv_name, job_description=None):
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        return "OpenAI API key not set."
+    # Setup CrewAI agent with OpenAI
+    inputs = {
+        'cv_name': cv_name,
+        'cv_text': cv_text ,
+        'job_description': job_description,
+    }
+    result = CrewAI().crew().kickoff(inputs=inputs)
+    return result
+
 def run_gemini_review(cv_text, cv_name, job_description=None):
     gemini_api_key = os.getenv("GEMINI_API_KEY")
     if not gemini_api_key:
@@ -244,8 +257,8 @@ def review_cv(cv: CVInfo):
         cv_text = get_github_cv_content(cv.path)
     else:
         return ReviewResult(cv_name=cv.name, review="Invalid source.")
-    # Run CrewAI + Gemini review, now with job description
-    review = run_gemini_review(cv_text, cv.name, cv.job_description)
+    # Run CrewAI + OpenAI review, now with job description
+    review = run_openai_review(cv_text, cv.name, cv.job_description)
     if hasattr(review, "raw"):
         review = review.raw
     return ReviewResult(cv_name=cv.name, review=review)
@@ -282,11 +295,11 @@ async def review_all_cvs(
                     total_tokens=0
                 )
 
-            # Step 3: Run Gemini/CrewAI review
+            # Step 3: Run OpenAI/CrewAI review
             try:
                 review_output = await loop.run_in_executor(
                     executor,
-                    run_gemini_review,
+                    run_openai_review,
                     cv_text,
                     cv.name,
                     job_description
@@ -324,7 +337,7 @@ async def review_all_cvs(
             
             # Step 5: Move qualified CVs to the qualified folder
             moved_to_qualified = False
-            if fit_score > 70 and cv.source == 'gdrive':
+            if fit_score > 80 and cv.source == 'gdrive':
                 try:
                     moved_to_qualified = await loop.run_in_executor(
                         executor,
