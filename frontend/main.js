@@ -31,6 +31,9 @@ async function loadGDriveFolders() {
       )
     ].join('');
     folderSelect.disabled = false;
+    
+    // Store folders globally for batch processing
+    window.allFolders = folders;
   } catch (error) {
     folderSelect.innerHTML = '<option value="">Error loading folders</option>';
     folderSelect.disabled = true;
@@ -196,6 +199,136 @@ async function previewCV(cv) {
   }
 }
 
+// Review all CVs in all folders
+async function reviewAllFolders() {
+  const allReviewsBox = document.getElementById('allReviewsBox');
+  const reviewAllBtn = document.getElementById('reviewAllBtn');
+  const stopBtn = document.getElementById('stopReviewAllBtn');
+
+  if (!window.allFolders || window.allFolders.length === 0) {
+    allReviewsBox.innerHTML = `
+      <div class="status-message status-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        No folders available. Please wait for folders to load.
+      </div>
+    `;
+    allReviewsBox.style.display = 'block';
+    return;
+  }
+
+  allReviewsBox.style.display = 'block';
+  allReviewsBox.innerHTML = `
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <div class="loading-text">Starting folder-by-folder CV analysis...</div>
+      <div class="progress-info">Processing 0 of ${window.allFolders.length} folders</div>
+    </div>
+  `;
+  allReviewsBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  reviewAllBtn.disabled = true;
+  stopBtn.style.display = 'inline-flex';
+  reviewAllAbortController = new AbortController();
+
+  let allResults = [];
+  let processedFolders = 0;
+
+  try {
+    for (const folder of window.allFolders) {
+      // Check if process was aborted
+      if (reviewAllAbortController.signal.aborted) {
+        throw new Error('Process aborted by user');
+      }
+
+      // Update progress
+      allReviewsBox.innerHTML = `
+        <div class="loading-container">
+          <div class="spinner"></div>
+          <div class="loading-text">Processing folder: ${folder.name}</div>
+          <div class="progress-info">Processing ${processedFolders + 1} of ${window.allFolders.length} folders</div>
+          <div class="folder-progress">
+            <div style="width: 300px; background: var(--border); border-radius: 10px; height: 12px; margin-top: 1rem; overflow: hidden;">
+              <div style="width: ${((processedFolders + 1) / window.allFolders.length) * 100}%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      try {
+        // Load folder contents (job description and CVs)
+        await loadFolderContents(folder.id);
+        
+        // Check if we have CVs to review
+        if (currentCVs && currentCVs.length > 0) {
+          // Get job description
+          const jobDescription = document.getElementById('jobDescription').value;
+          
+          if (jobDescription.trim()) {
+            // Review all CVs in this folder
+            const res = await fetch(`http://localhost:8000/review_all`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                job_description: jobDescription, 
+                cvs: currentCVs, 
+                qualified_folder_id: qualifiedFolderId 
+              }),
+              signal: reviewAllAbortController.signal
+            });
+
+            if (res.ok) {
+              const folderResults = await res.json();
+              // Add folder name to each result
+              const resultsWithFolder = folderResults.map(result => ({
+                ...result,
+                folder_name: folder.name
+              }));
+              allResults.push(...resultsWithFolder);
+            }
+          }
+        }
+      } catch (folderError) {
+        console.error(`Error processing folder ${folder.name}:`, folderError);
+        // Continue with next folder
+      }
+
+      processedFolders++;
+    }
+
+    // Render all results
+    if (allResults.length > 0) {
+      renderFolderResults(allResults);
+    } else {
+      allReviewsBox.innerHTML = `
+        <div class="status-message status-warning">
+          <i class="fas fa-search"></i>
+          No CVs found to review across all folders.
+        </div>
+      `;
+    }
+
+  } catch (error) {
+    if (error.name === 'AbortError' || error.message.includes('aborted')) {
+      allReviewsBox.innerHTML = `
+        <div class="status-message status-warning">
+          <i class="fas fa-hand-paper"></i>
+          Folder processing stopped by user.
+        </div>
+      `;
+    } else {
+      allReviewsBox.innerHTML = `
+        <div class="status-message status-error">
+          <i class="fas fa-exclamation-circle"></i>
+          Error during folder processing: ${error.message}
+        </div>
+      `;
+    }
+  } finally {
+    reviewAllBtn.disabled = false;
+    stopBtn.style.display = 'none';
+  }
+}
+
 // Review all CVs
 async function reviewAllCVs() {
   const jobDescription = document.getElementById('jobDescription').value;
@@ -267,6 +400,172 @@ function stopReviewAllCVs() {
   if (reviewAllAbortController) {
     reviewAllAbortController.abort();
   }
+}
+
+// Render results from multiple folders
+function renderFolderResults(results) {
+  const allReviewsBox = document.getElementById('allReviewsBox');
+
+  if (!Array.isArray(results) || results.length === 0) {
+    allReviewsBox.innerHTML = `
+      <div class="status-message status-warning">
+        <i class="fas fa-search"></i>
+        No reviews found across all folders.
+      </div>
+    `;
+    return;
+  }
+
+  // Group results by folder/position
+  const resultsByFolder = {};
+  results.forEach(result => {
+    const folderName = result.folder_name;
+    if (!resultsByFolder[folderName]) {
+      resultsByFolder[folderName] = [];
+    }
+    resultsByFolder[folderName].push(result);
+  });
+
+  // Sort results within each folder by fit_score descending
+  Object.keys(resultsByFolder).forEach(folderName => {
+    resultsByFolder[folderName].sort((a, b) => b.fit_score - a.fit_score);
+  });
+
+  const totalCVs = results.length;
+  const totalFolders = Object.keys(resultsByFolder).length;
+  const overallTopScore = Math.max(...results.map(r => r.fit_score));
+  const overallAvgScore = Math.round(results.reduce((sum, r) => sum + r.fit_score, 0) / results.length);
+
+  let html = `
+    <div class="results-container fade-in">
+      <div class="results-header">
+        <h2 class="results-title">
+          <i class="fas fa-trophy"></i>
+          CV Rankings by Position
+        </h2>
+        <div class="results-summary">
+          <div class="summary-item">
+            <i class="fas fa-folder"></i>
+            <span><strong>${totalFolders}</strong> Positions</span>
+          </div>
+          <div class="summary-item">
+            <i class="fas fa-users"></i>
+            <span><strong>${totalCVs}</strong> Total CVs</span>
+          </div>
+          <div class="summary-item">
+            <i class="fas fa-star"></i>
+            <span>Overall Top: <strong>${overallTopScore}</strong></span>
+          </div>
+          <div class="summary-item">
+            <i class="fas fa-chart-line"></i>
+            <span>Overall Avg: <strong>${overallAvgScore}</strong></span>
+          </div>
+          <div class="summary-item">
+            <i class="fas fa-microchip"></i>
+            <span>Total Tokens: <strong>${results.reduce((sum, r) => sum + r.total_tokens, 0).toLocaleString()}</strong></span>
+          </div>
+        </div>
+      </div>
+  `;
+
+  // Generate a table for each position
+  Object.entries(resultsByFolder).forEach(([folderName, folderResults]) => {
+    const folderTopScore = Math.max(...folderResults.map(r => r.fit_score));
+    const folderAvgScore = Math.round(folderResults.reduce((sum, r) => sum + r.fit_score, 0) / folderResults.length);
+    const folderTotalTokens = folderResults.reduce((sum, r) => sum + r.total_tokens, 0);
+
+    html += `
+      <div class="position-section">
+        <div class="position-header">
+          <h3 class="position-title">
+            <i class="fas fa-briefcase"></i>
+            ${folderName}
+          </h3>
+          <div class="position-summary">
+            <span class="position-stat">
+              <i class="fas fa-users"></i>
+              <strong>${folderResults.length}</strong> CVs
+            </span>
+            <span class="position-stat">
+              <i class="fas fa-star"></i>
+              Top: <strong>${folderTopScore}</strong>
+            </span>
+            <span class="position-stat">
+              <i class="fas fa-chart-line"></i>
+              Avg: <strong>${folderAvgScore}</strong>
+            </span>
+            <span class="position-stat">
+              <i class="fas fa-microchip"></i>
+              <strong>${folderTotalTokens.toLocaleString()}</strong> tokens
+            </span>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="results-table position-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>CV Details</th>
+                <th>Fit Score</th>
+                <th>Actions</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${folderResults.map((result, index) => {
+                const ownerName = extractOwnerName(result.cv_name, result.cv_path || '');
+                const cvData = findCVData(result.cv_name, result.cv_path);
+
+                return `
+                  <tr>
+                    <td class="rank-cell ${getRankClass(index + 1)}">
+                      ${getRankIcon(index + 1)} ${index + 1}
+                    </td>
+                    <td class="cv-info-cell">
+                      <div class="cv-name-cell" title="${result.cv_name}">
+                        <i class="fas fa-file-pdf"></i>
+                        ${result.cv_name}
+                      </div>
+                      <div class="cv-owner-cell">
+                        <i class="fas fa-user"></i>
+                        ${ownerName}
+                      </div>
+                    </td>
+                    <td>
+                      <span class="score-badge ${getScoreClass(result.fit_score)}">
+                        ${result.fit_score}
+                      </span>
+                      <div class="token-usage">
+                        <small class="token-count" title="Total tokens">
+                          <i class="fas fa-microchip"></i> ${result.total_tokens.toLocaleString()}
+                        </small>
+                      </div>
+                    </td>
+                    <td class="actions-cell">
+                      <div class="action-buttons">
+                        <button onclick='previewCV(${JSON.stringify(cvData).replace(/'/g, "&#39;")})' class="btn btn-secondary btn-xs" title="Preview Content">
+                          <i class="fas fa-eye"></i>
+                          Preview
+                        </button>
+                      </div>
+                    </td>
+                    <td class="review-content">
+                      ${marked.parse(result.review)}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+
+  allReviewsBox.innerHTML = html;
+  allReviewsBox.scrollIntoView({ behavior: 'smooth' });
 }
 
 // Render results table with action buttons
@@ -437,6 +736,29 @@ function hideAllSections() {
   document.getElementById('allReviewsBox').style.display = 'none';
 }
 
+// Load both job description and CVs in parallel from a parent folder
+async function loadFolderContents(parentFolderId) {
+  try {
+    // Fetch subfolders and load CVs & job description in parallel
+    const folders = await fetchGDriveFolders(parentFolderId);
+
+    // Find relevant subfolder IDs
+    const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
+    const jobDescFolderId = folders.find(folder => folder.name === JOB_DESCRIPTIONS_FOLDER_NAME)?.id || '';
+    qualifiedFolderId = folders.find(folder => folder.name === QUALIFICATIONS_CV_LIST_FOLDER_NAME)?.id || '';
+    
+    // Load CVs and job description concurrently
+    await Promise.all([
+      loadJobDescription(jobDescFolderId),
+      loadCVs(cvFolderId)
+    ]);
+  } catch (error) {
+    console.error('Error loading folder contents:', error);
+    document.getElementById('cvList').innerHTML = handleError(error, 'Folder Contents');
+    throw error; // Re-throw to allow caller to handle if needed
+  }
+}
+
 // Load job description from server based on selected folder
 async function loadJobDescription(folderId = '') {
   const jobDescTextarea = document.getElementById('jobDescription');
@@ -455,51 +777,30 @@ async function loadJobDescription(folderId = '') {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function () {
-  // Add folder change event listener
-  document.getElementById('folderSelect').addEventListener('change', async function () {
-    if (this.value !== '') {
-      // Show container and loading state
-      const cvListContainer = document.getElementById('cvListContainer');
-      const cvList = document.getElementById('cvList');
-      cvListContainer.style.display = 'block';
-      cvList.innerHTML = `
-         <div class="loading-container">
-         <div class="spinner"></div>
-         <div class="loading-text">Loading CVs...</div>
-         </div>
-     `;
-      // Scroll to bottom after loading starts
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-      // Hide other sections
-      hideAllSections();
-      
-      const folderId = this.value;
-      
-      // Load both job description and CVs in parallel
-      try {
-        // Fetch subfolders and load CVs & job description in parallel
-        const folders = await fetchGDriveFolders(folderId);
+  // Hide folder selector since we're processing all folders
+  const folderSelectContainer = document.getElementById('folderSelectContainer');
+  if (folderSelectContainer) {
+    folderSelectContainer.style.display = 'none';
+  }
 
-        // Find relevant subfolder IDs
-        const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
-        const jobDescFolderId = folders.find(folder => folder.name === JOB_DESCRIPTIONS_FOLDER_NAME)?.id || '';
-        qualifiedFolderId = folders.find(folder => folder.name === QUALIFICATIONS_CV_LIST_FOLDER_NAME)?.id || '';
-        // Load CVs and job description concurrently
-        await Promise.all([
-          loadJobDescription(jobDescFolderId),
-          loadCVs(cvFolderId)
-        ]);
-      } catch (error) {
-        console.error('Error loading folder contents:', error);
-        document.getElementById('cvList').innerHTML = handleError(error, 'Folder Contents');
-      }
-    } else {
-      // Hide CV list container and reset job description
-      document.getElementById('cvListContainer').style.display = 'none';
-      document.getElementById('jobDescription').value = '';
-      hideAllSections();
-    }
-  });
+  // Hide CV list container initially
+  const cvListContainer = document.getElementById('cvListContainer');
+  if (cvListContainer) {
+    cvListContainer.style.display = 'none';
+  }
+
+  // Hide job description container initially
+  const jobDescContainer = document.getElementById('jobDescriptionContainer');
+  if (jobDescContainer) {
+    jobDescContainer.style.display = 'none';
+  }
+
+  // Update the Review All button to use the new function
+  const reviewAllBtn = document.getElementById('reviewAllBtn');
+  if (reviewAllBtn) {
+    reviewAllBtn.textContent = 'Review & Rank All Positions';
+    reviewAllBtn.onclick = reviewAllFolders;
+  }
 
   // Initial load of folders
   loadGDriveFolders();
@@ -516,20 +817,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const jobDescTextarea = document.getElementById('jobDescription');
   let saveTimeout;
-  jobDescTextarea.addEventListener('input', function () {
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      console.log('Job description updated');
-    }, 1000);
-  });
-
-
+  if (jobDescTextarea) {
+    jobDescTextarea.addEventListener('input', function () {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        console.log('Job description updated');
+      }, 1000);
+    });
+  }
 
   const tooltips = {
-    'source': 'Choose where your CV files are stored',
-    'jobDescription': 'Provide detailed job requirements for accurate AI matching',
-    'reviewAllBtn': 'Keyboard shortcut: Ctrl/Cmd + R',
-    'loadCVs': 'Keyboard shortcut: Ctrl/Cmd + L'
+    'reviewAllBtn': 'Process all folders and rank CVs across all positions',
   };
 
   Object.entries(tooltips).forEach(([id, text]) => {
