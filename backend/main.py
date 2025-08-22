@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query, Body, Request
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import io
 from pdfminer.high_level import extract_text
+from datetime import datetime
 
 app = FastAPI()
 
@@ -267,7 +268,8 @@ def review_cv(cv: CVInfo):
 async def review_all_cvs(
     cvs: List[CVInfo],
     job_description: Optional[str] = Body(None),
-    qualified_folder_id: Optional[str] = Body(None)
+    qualified_folder_id: Optional[str] = Body(None),
+    unqualified_folder_id: Optional[str] = Body(None)
 ):
 
     # Create a single ThreadPoolExecutor for all tasks
@@ -335,25 +337,39 @@ async def review_all_cvs(
             # Debug logging
             print(f"[DEBUG] {cv.name} Fit Score: {fit_score}")
             
-            # Step 5: Move qualified CVs to the qualified folder
+            # Step 5: Move CVs to appropriate folders based on score
             moved_to_qualified = False
-            if fit_score > 80 and cv.source == 'gdrive':
-                try:
-                    moved_to_qualified = await loop.run_in_executor(
-                        executor,
-                        move_to_qualified_folder,
-                        cv.path,
-                        qualified_folder_id
-                    )
-                    if moved_to_qualified:
-                        print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
-                except Exception as e:
-                    print(f"[ERROR] Failed to move CV {cv.name} to qualified folder: {str(e)}")
-                    # Continue processing even if move fails
+            moved_to_unqualified = False
+            if cv.source == 'gdrive':
+                if fit_score > 80 and qualified_folder_id:
+                    try:
+                        moved_to_qualified = await loop.run_in_executor(
+                            executor,
+                            move_to_qualified_folder,
+                            cv.path,
+                            qualified_folder_id
+                        )
+                        if moved_to_qualified:
+                            print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to move CV {cv.name} to qualified folder: {str(e)}")
+                elif fit_score <= 80 and unqualified_folder_id:
+                    try:
+                        moved_to_unqualified = await loop.run_in_executor(
+                            executor,
+                            move_to_qualified_folder,
+                            cv.path,
+                            unqualified_folder_id
+                        )
+                        if moved_to_unqualified:
+                            print(f"[INFO] Moved unqualified CV {cv.name} to unqualified folder")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to move CV {cv.name} to unqualified folder: {str(e)}")
 
+            move_note = '[Moved to qualified folder]' if moved_to_qualified else ('[Moved to unqualified folder]' if moved_to_unqualified else '')
             return ReviewAllResult(
                 cv_name=cv.name,
-                review=f"{review}\n\n{'[Moved to qualified folder]' if moved_to_qualified else ''}",
+                review=f"{review}\n\n{move_note}",
                 fit_score=fit_score,
                 token_count=token_count,
                 prompt_tokens=prompt_tokens,
@@ -566,4 +582,77 @@ def get_cv_content(source: str, path: str):
         return get_gdrive_cv_content(path)
     elif source == 'github':
         return get_github_cv_content(path)
-    return "Invalid source" 
+    return "Invalid source"
+
+@app.post("/webhooks/drive-cv-upload")
+async def handle_drive_webhook(request: Request):
+    """
+    Endpoint to handle Google Drive webhook events for CV uploads.
+    It determines the folder, loads CVs and the job description,
+    runs the review and ranking using existing logic, and saves results to evaluations/results.
+    """
+    try:
+        body = await request.json()
+        event_type = body.get('eventType') or body.get('event_type')
+        file_id = body.get('fileId') or body.get('file_id')
+        file_name = body.get('name') or body.get('file_name')
+        folder_id = body.get('folderId') or body.get('folder_id')
+
+        print(f"[INFO] Drive webhook: type={event_type} file_id={file_id} name={file_name} folder_id={folder_id}")
+
+        # Resolve folder_id from file parents if missing
+        if not folder_id and file_id:
+            creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+            if not creds_json:
+                return PlainTextResponse(content="Missing GOOGLE_DRIVE_CREDENTIALS", status_code=500)
+            if creds_json.strip().startswith('{'):
+                creds_dict = json.loads(creds_json)
+            else:
+                with open(creds_json) as f:
+                    creds_dict = json.load(f)
+            creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
+            service = build('drive', 'v3', credentials=creds)
+            meta = service.files().get(fileId=file_id, fields='parents').execute()
+            parents = meta.get('parents', [])
+            folder_id = parents[0] if parents else os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+
+        if not folder_id:
+            return PlainTextResponse(content="No folder_id resolved", status_code=400)
+
+        # Ensure default envs for subsequent helpers
+        if os.getenv("GOOGLE_DRIVE_FOLDER_ID") != folder_id:
+            os.environ["GOOGLE_DRIVE_FOLDER_ID"] = folder_id
+
+        # Load job description from same folder
+        job_description_text = get_job_description_from_drive(folder_id)
+
+        # List CVs in the folder
+        cvs_to_review = list_gdrive_cvs(folder_id)
+        if not cvs_to_review:
+            return PlainTextResponse(content="No CVs found to process.", status_code=200)
+
+        # Run review for all CVs
+        qualified_folder_id = os.getenv("GOOGLE_DRIVE_QUALIFIED_FOLDER_ID")
+        results = await review_all_cvs(
+            cvs_to_review,
+            job_description=job_description_text,
+            qualified_folder_id=qualified_folder_id,
+            unqualified_folder_id=os.getenv("GOOGLE_DRIVE_UNQUALIFIED_FOLDER_ID")
+        )
+
+        # Serialize results to JSON-safe structures
+        serializable = [r.dict() if hasattr(r, 'dict') else r for r in results]
+
+        # Save results
+        results_dir = os.path.join("evaluations", "results")
+        os.makedirs(results_dir, exist_ok=True)
+        filename = f"review_results_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+        filepath = os.path.join(results_dir, filename)
+        with open(filepath, "w") as f:
+            json.dump(serializable, f, indent=2)
+
+        return PlainTextResponse(content=f"Saved {len(serializable)} reviews to {filepath}", status_code=200)
+
+    except Exception as e:
+        print(f"[ERROR] Drive webhook failed: {str(e)}")
+        return PlainTextResponse(content=f"Error: {str(e)}", status_code=500) 
