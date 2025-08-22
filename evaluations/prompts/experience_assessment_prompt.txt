@@ -1,0 +1,27 @@
+Assess the candidate's work experience and career progression.
+
+**CV Content:**
+{{cv_text}}
+
+**Position Requirements:**
+{{job_requirements}}
+
+**Experience Evaluation:**
+1. Total years of relevant experience
+2. Career progression pattern
+3. Complexity of projects handled
+4. Leadership and mentoring experience
+5. Industry relevance
+
+**Focus Areas:**
+- Quantify experience where possible
+- Identify gaps or transitions in career
+- Evaluate project complexity and impact
+- Note any management or team leadership roles
+
+**Avoid any assumptions about:**
+- Personal characteristics not related to work
+- Cultural fit based on non-professional factors
+- Motivation or commitment not evidenced in work history
+
+Provide only factual assessment based on documented professional experience.

@@ -1,0 +1,30 @@
+Review this CV analysis for potential bias or inappropriate content.
+
+**CV Analysis to Review:**
+{{cv_text}}
+
+**Bias Detection Checklist:**
+1. Gender bias indicators
+2. Age-related assumptions
+3. Cultural or ethnic bias
+4. Appearance-related comments
+5. Personal life assumptions
+6. Socioeconomic bias
+7. Educational institution prejudice
+
+**Red Flags to Identify:**
+- References to physical appearance
+- Assumptions about family status or commitments
+- Cultural fit assessments based on personal characteristics
+- Age-related language (young, old, energetic, mature)
+- Gender-specific language or assumptions
+- Bias toward prestigious institutions vs. skill demonstration
+
+**Output:**
+- BIAS_DETECTED: Yes/No
+- BIAS_TYPE: [if detected, specify type]
+- PROBLEMATIC_PHRASES: [list specific text]
+- SEVERITY: Low/Medium/High
+- RECOMMENDATIONS: [how to improve the analysis]
+
+Focus on ensuring fair, skills-based evaluation only.

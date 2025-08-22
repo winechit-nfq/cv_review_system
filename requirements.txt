@@ -6,4 +6,5 @@ google-auth
 PyGithub
 python-dotenv
 python-docx
-pdfminer.six 
+pdfminer.six
+promptfoo 

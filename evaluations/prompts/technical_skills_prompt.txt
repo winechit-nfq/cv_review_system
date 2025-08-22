@@ -1,0 +1,22 @@
+Analyze the technical skills mentioned in this CV and rate their proficiency level.
+
+**CV Content:**
+{{cv_text}}
+
+**Required Technical Skills:**
+{{job_requirements}}
+
+**Task:**
+For each technical skill mentioned in the CV:
+1. Identify the skill
+2. Determine proficiency level based on context (Beginner/Intermediate/Advanced/Expert)
+3. Note years of experience if mentioned
+4. Identify any certifications or formal training
+
+**Skills Assessment Criteria:**
+- Beginner: Basic knowledge, learning phase
+- Intermediate: 1-3 years, can work independently on simple tasks
+- Advanced: 3-5 years, can handle complex tasks and mentor others
+- Expert: 5+ years, thought leader, can architect solutions
+
+**Output only the technical analysis without personal opinions or assumptions.**

@@ -12,6 +12,7 @@ from crewai import Crew, Agent, Task
 import re
 import json
 from backend.crew import CrewAI
+from backend.promptfoo_integration import PromptfooEvaluator, CVEvaluationAgent
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import io
@@ -717,4 +718,113 @@ def get_cv_content(source: str, path: str):
         return get_gdrive_cv_content(path)
     elif source == 'github':
         return get_github_cv_content(path)
+
+# Promptfoo Evaluation Endpoints
+evaluation_agent = CVEvaluationAgent()
+
+class EvaluationRequest(BaseModel):
+    cv_text: str
+    job_requirements: str
+    analysis_result: str
+
+class EvaluationResponse(BaseModel):
+    overall_score: float
+    status: str
+    evaluations: dict
+    summary: str
+    results_file: Optional[str] = None
+
+@app.post("/evaluate/cv_analysis", response_model=EvaluationResponse)
+async def evaluate_cv_analysis(request: EvaluationRequest):
+    """
+    Evaluate CV analysis using Promptfoo for quality, bias, and security testing.
+    
+    This endpoint runs comprehensive evaluation including:
+    - Bias detection
+    - Security validation
+    - Hallucination testing
+    - Output quality assessment
+    """
+    try:
+        results = await evaluation_agent.evaluate_crew_output(
+            crew_output=request.analysis_result,
+            cv_text=request.cv_text,
+            job_requirements=request.job_requirements,
+            save_results=True
+        )
+        
+        summary = evaluation_agent.get_evaluation_summary(results)
+        
+        return EvaluationResponse(
+            overall_score=results.get('overall_score', 0),
+            status=results.get('status', 'unknown'),
+            evaluations=results.get('evaluations', {}),
+            summary=summary,
+            results_file=results.get('results_file')
+        )
+        
+    except Exception as e:
+        logger.error(f"Error during evaluation: {str(e)}")
+        return EvaluationResponse(
+            overall_score=0,
+            status="error",
+            evaluations={"error": str(e)},
+            summary=f"Evaluation failed: {str(e)}"
+        )
+
+@app.post("/evaluate/bias_check")
+async def evaluate_bias_only(analysis_text: str = Body(..., embed=True)):
+    """
+    Quick bias detection check for CV analysis text.
+    """
+    try:
+        evaluator = PromptfooEvaluator()
+        results = await evaluator.run_bias_detection(analysis_text)
+        return results
+    except Exception as e:
+        return {"error": str(e), "status": "failed"}
+
+@app.post("/evaluate/security_check")
+async def evaluate_security_only(analysis_text: str = Body(..., embed=True)):
+    """
+    Security validation check for prompt injection and other security issues.
+    """
+    try:
+        evaluator = PromptfooEvaluator()
+        results = await evaluator.run_security_test(analysis_text)
+        return results
+    except Exception as e:
+        return {"error": str(e), "status": "failed"}
+
+@app.get("/evaluate/results/{filename}")
+async def get_evaluation_results(filename: str):
+    """
+    Retrieve saved evaluation results by filename.
+    """
+    try:
+        results_path = f"evaluations/results/{filename}"
+        if os.path.exists(results_path):
+            with open(results_path, 'r') as f:
+                return json.load(f)
+        else:
+            return {"error": "Results file not found", "status": "not_found"}
+    except Exception as e:
+        return {"error": str(e), "status": "failed"}
+
+@app.get("/evaluate/health")
+async def evaluation_health_check():
+    """
+    Health check for evaluation system.
+    """
+    return {
+        "status": "healthy",
+        "promptfoo_available": True,
+        "evaluation_features": [
+            "bias_detection",
+            "security_validation", 
+            "hallucination_testing",
+            "quality_assessment"
+        ],
+        "config_path": "evaluations/promptfooconfig.yaml"
+    }
     return "Invalid source" 

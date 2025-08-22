@@ -1,0 +1,29 @@
+Emily Johnson
+Junior Software Developer
+
+EXPERIENCE:
+• Junior Developer at WebSolutions Inc. (2023-2024)
+  - Developed responsive web applications using HTML, CSS, JavaScript
+  - Learned React and contributed to frontend development
+  - Participated in code reviews and agile development process
+  - Fixed bugs and implemented small features
+
+• Intern Developer at LocalTech (Summer 2022)
+  - Built basic CRUD applications using Python Flask
+  - Learned database fundamentals with MySQL
+  - Completed 3-month internship program
+
+TECHNICAL SKILLS:
+• Programming: JavaScript (2 years), Python (1.5 years), HTML/CSS (2 years)
+• Frameworks: React (1 year), Flask (6 months)
+• Databases: MySQL (basic), MongoDB (learning)
+• Tools: Git, VS Code, Chrome DevTools
+
+EDUCATION:
+• B.S. Computer Science, Community College (2023)
+• Relevant Coursework: Data Structures, Algorithms, Web Development
+
+PROJECTS:
+• Personal Portfolio Website (React, CSS Grid)
+• Todo App with REST API (Flask, MySQL)
+• Weather App (JavaScript, API integration)

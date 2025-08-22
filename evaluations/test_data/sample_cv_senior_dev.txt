@@ -1,0 +1,28 @@
+John Smith
+Senior Software Developer
+
+EXPERIENCE:
+• Senior Python Developer at TechCorp (2019-2024)
+  - Led development of microservices architecture using Python, FastAPI, and Docker
+  - Managed team of 4 junior developers
+  - Implemented CI/CD pipelines with AWS CodePipeline
+  - Built React frontend applications with TypeScript
+
+• Software Engineer at StartupXYZ (2017-2019)  
+  - Developed REST APIs using Python Flask
+  - Worked with PostgreSQL and Redis databases
+  - Experience with AWS EC2, RDS, and S3
+
+TECHNICAL SKILLS:
+• Programming: Python (6+ years), JavaScript (5+ years), TypeScript (3+ years)
+• Frameworks: FastAPI, Flask, React, Node.js
+• Databases: PostgreSQL, MongoDB, Redis
+• Cloud: AWS (EC2, RDS, S3, Lambda), Docker, Kubernetes
+• Tools: Git, Jenkins, pytest, Jest
+
+EDUCATION:
+• B.S. Computer Science, State University (2017)
+
+CERTIFICATIONS:
+• AWS Certified Solutions Architect (2022)
+• Certified Kubernetes Administrator (2023)
