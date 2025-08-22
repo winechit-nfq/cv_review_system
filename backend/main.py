@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query, Body, Request, BackgroundTasks, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,19 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import io
 from pdfminer.high_level import extract_text
+from backend.models import CVInfo, ReviewResult, ReviewAllResult
+from backend.cv_utils import (
+    get_gdrive_cv_content,
+    get_github_cv_content,
+    run_openai_review,
+    run_gemini_review,
+    extract_fit_score,
+    move_to_qualified_folder,
+    get_job_description_from_drive,
+    get_file_content
+)
+from backend.webhook_handler import webhook_handler
+from backend.auto_processor import auto_processor
 
 app = FastAPI()
 
@@ -26,27 +39,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Placeholder for CV metadata
-class CVInfo(BaseModel):
-    name: str
-    source: str  # 'gdrive' or 'github'
-    path: str
-    job_description: Optional[str] = None
-
-# Placeholder for review result
-class ReviewResult(BaseModel):
-    cv_name: str
-    review: str
-
-class ReviewAllResult(BaseModel):
-    cv_name: str
-    review: str
-    fit_score: int
-    token_count: Optional[int] = 0
-    prompt_tokens: Optional[int] = 0
-    completion_tokens: Optional[int] = 0
-    total_tokens: Optional[int] = 0
 
 def list_gdrive_folders(parent_id: str = None):
     creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
@@ -162,80 +154,6 @@ def move_to_qualified_folder(file_id: str, qualified_folder_id: str) -> bool:
     except Exception as e:
         print(f"[ERROR] Failed to move file {file_id} to qualified folder: {str(e)}")
         return False
-
-def get_gdrive_cv_content(file_id):
-    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    import json
-    if creds_json.strip().startswith('{'):
-        creds_dict = json.loads(creds_json)
-    else:
-        with open(creds_json) as f:
-            creds_dict = json.load(f)
-    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
-    service = build('drive', 'v3', credentials=creds)
-    file = service.files().get(fileId=file_id, fields="name, mimeType").execute()
-    mime = file['mimeType']
-    if mime == 'application/pdf':
-        data = service.files().get_media(fileId=file_id).execute()
-        import io
-        from pdfminer.high_level import extract_text
-        text = extract_text(io.BytesIO(data))
-        return text
-    elif mime == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-        data = service.files().get_media(fileId=file_id).execute()
-        import io
-        from docx import Document
-        doc = Document(io.BytesIO(data))
-        return '\n'.join([p.text for p in doc.paragraphs])
-    return "Unsupported file type"
-
-def get_github_cv_content(path):
-    token = os.getenv("GITHUB_TK")
-    repo_name = os.getenv("GITHUB_REPO")
-    if not token or not repo_name:
-        return ""
-    g = Github(token)
-    repo = g.get_repo(repo_name)
-    file_content = repo.get_contents(path)
-    if file_content.name.lower().endswith('.pdf'):
-        import io
-        from pdfminer.high_level import extract_text
-        data = base64.b64decode(file_content.content)
-        text = extract_text(io.BytesIO(data))
-        return text
-    elif file_content.name.lower().endswith('.docx'):
-        import io
-        from docx import Document
-        data = base64.b64decode(file_content.content)
-        doc = Document(io.BytesIO(data))
-        return '\n'.join([p.text for p in doc.paragraphs])
-    return "Unsupported file type"
-
-def run_openai_review(cv_text, cv_name, job_description=None):
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        return "OpenAI API key not set."
-    # Setup CrewAI agent with OpenAI
-    inputs = {
-        'cv_name': cv_name,
-        'cv_text': cv_text ,
-        'job_description': job_description,
-    }
-    result = CrewAI().crew().kickoff(inputs=inputs)
-    return result
-
-def run_gemini_review(cv_text, cv_name, job_description=None):
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
-    if not gemini_api_key:
-        return "Gemini API key not set."
-    # Setup CrewAI agent with Gemini
-    inputs = {
-        'cv_name': cv_name,
-        'cv_text': cv_text ,
-        'job_description': job_description,
-    }
-    result = CrewAI().crew().kickoff(inputs=inputs)
-    return result
 
 @app.get("/gdrive/folders")
 def get_gdrive_folders(parent_id: Optional[str] = None):
@@ -410,150 +328,6 @@ async def review_all_cvs(
             print(f"[ERROR] Failed to shutdown executor: {str(e)}")
 
 
-def extract_fit_score(review_text: str) -> int:
-    """
-    Extract fit score from review text with multiple fallback patterns.
-    Returns an integer between 0-100, defaulting to 0 if not found.
-    """
-    if not review_text:
-        return 0
-    
-    # Multiple regex patterns to catch different formats
-    patterns = [
-        # "Fit Score: 85" or "fit score: 85" (case insensitive, at start of line)
-        r"(?i)^fit\s*score\s*:\s*(\d+(?:\.\d+)?)",
-        
-        # "Fit Score: 85" anywhere in text
-        r"(?i)fit\s*score\s*:\s*(\d+(?:\.\d+)?)",
-        
-        # "Score: 85" or "Overall Score: 85"
-        r"(?i)(?:overall\s+)?score\s*:\s*(\d+(?:\.\d+)?)",
-        
-        # "85/100" or "85 out of 100"
-        r"(\d+(?:\.\d+)?)\s*(?:/100|out\s+of\s+100)",
-        
-        # Numbers followed by % (assuming it's out of 100)
-        r"(\d+(?:\.\d+)?)%",
-        
-        # Just look for any number in parentheses like "(85)"
-        r"\((\d+(?:\.\d+)?)\)",
-    ]
-    
-    for pattern in patterns:
-        matches = re.findall(pattern, review_text, re.MULTILINE)
-        if matches:
-            try:
-                # Take the first match
-                score = float(matches[0])
-                
-                # Ensure score is within reasonable bounds (0-100)
-                if score > 100:
-                    score = min(score, 100)  # Cap at 100
-                elif score < 0:
-                    score = 0
-                
-                return int(round(score))
-            except (ValueError, TypeError) as e:
-                print(f"[WARN] Failed to parse score '{matches[0]}': {e}")
-                continue
-    
-    # If no patterns match, try to find any number that might be a score
-    # Look for standalone numbers between 0-100
-    standalone_numbers = re.findall(r'\b(\d+(?:\.\d+)?)\b', review_text)
-    for num_str in standalone_numbers:
-        try:
-            num = float(num_str)
-            if 0 <= num <= 100:
-                print(f"[INFO] Using standalone number {num} as potential fit score")
-                return int(round(num))
-        except ValueError:
-            continue
-    
-    print(f"[WARN] No fit score found in review text: {review_text[:200]}...")
-    return 0
-
-
-def get_file_content(service, file_id):
-    """Helper function to get the content of a file from Google Drive."""
-    try:
-        # Get file metadata to check its type
-        file = service.files().get(fileId=file_id, fields="mimeType, name").execute()
-        mime_type = file.get('mimeType', '')
-        
-        # Get the file content
-        data = service.files().get_media(fileId=file_id).execute()
-        
-        if mime_type == 'application/pdf':
-            # Handle PDF files
-            return extract_text(io.BytesIO(data))
-            
-        elif mime_type == 'application/vnd.google-apps.document':
-            # For Google Docs, use the export method
-            data = service.files().export(
-                fileId=file_id,
-                mimeType='text/plain'
-            ).execute()
-            return data.decode('utf-8') if isinstance(data, bytes) else str(data)
-            
-        else:
-            # For regular text files
-            if isinstance(data, bytes):
-                # Try different encodings
-                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
-                for encoding in encodings:
-                    try:
-                        return data.decode(encoding)
-                    except UnicodeDecodeError:
-                        continue
-                return data.decode('utf-8', errors='ignore')
-            return str(data)
-            
-    except Exception as e:
-        raise Exception(f"Error reading file: {str(e)}")
-
-def get_job_description_from_drive(folder_id=None):
-    """Get job description from a file in Google Drive."""
-    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    if not creds_json:
-        return "No Google Drive credentials configured"
-    
-    if creds_json.strip().startswith('{'):
-        creds_dict = json.loads(creds_json)
-    else:
-        with open(creds_json) as f:
-            creds_dict = json.load(f)
-            
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict, 
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    service = build('drive', 'v3', credentials=creds)
-
-    try:
-        if folder_id:
-        
-            results = service.files().list(
-                q=f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document') and trashed=false",
-                fields="files(id, name, mimeType)",
-                pageSize=1,  # We only need the first matching file
-                orderBy="createdTime desc"  # Get the most recent file if multiple exist
-            ).execute()
-
-            files = results.get('files', [])
-            if not files:
-                return "No job description file found in the selected folder"
-
-            # Use the first matching file
-            file_id = files[0]['id']
-            print(f"[INFO] Found job description file: {files[0]['name']}")
-            return get_file_content(service, file_id)
-        else:
-            return 'No folder ID provided. No job description file found in the selected folder.'
-
-    except Exception as e:
-        error_msg = f"Error reading job description: {str(e)}"
-        print(f"[ERROR] {error_msg}")
-        return error_msg
 
 @app.get("/job_description", response_class=PlainTextResponse)
 def get_job_description(folder_id: Optional[str] = None):
@@ -566,4 +340,78 @@ def get_cv_content(source: str, path: str):
         return get_gdrive_cv_content(path)
     elif source == 'github':
         return get_github_cv_content(path)
-    return "Invalid source" 
+    return "Invalid source"
+
+# Webhook endpoints for automatic CV processing
+@app.post("/webhook/drive")
+async def handle_drive_webhook(request: Request, background_tasks: BackgroundTasks):
+    """Handle Google Drive push notifications for automatic CV processing."""
+    return await webhook_handler.handle_drive_notification(request, background_tasks)
+
+@app.post("/webhook/setup")
+async def setup_webhook_monitoring(
+    folder_id: str = Body(...),
+    position_name: str = Body(...)
+):
+    """Setup webhook monitoring for a specific Google Drive folder."""
+    try:
+        result = await webhook_handler.setup_webhook_for_folder(folder_id, position_name)
+        return {"status": "success", "channel_info": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/webhook/stop")
+async def stop_webhook_monitoring(channel_id: str = Body(...)):
+    """Stop webhook monitoring for a specific channel."""
+    try:
+        await webhook_handler.stop_webhook_for_folder(channel_id)
+        return {"status": "success", "message": f"Stopped monitoring channel {channel_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/webhook/status")
+def get_webhook_status():
+    """Get current webhook monitoring status."""
+    return {
+        "monitored_folders": webhook_handler.monitored_folders,
+        "active_channels": list(webhook_handler.webhook_channels.keys())
+    }
+
+# Auto-processing endpoints (polling-based alternative)
+@app.post("/auto-process/start")
+async def start_auto_processing():
+    """Start automatic CV processing using polling method."""
+    try:
+        await auto_processor.start_monitoring()
+        return {"status": "success", "message": "Auto-processing started"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/auto-process/stop")
+def stop_auto_processing():
+    """Stop automatic CV processing."""
+    auto_processor.stop_monitoring()
+    return {"status": "success", "message": "Auto-processing stopped"}
+
+@app.post("/auto-process/add-folder")
+async def add_folder_to_auto_process(
+    folder_id: str = Body(...),
+    position_name: str = Body(...)
+):
+    """Add a folder to automatic processing monitoring."""
+    try:
+        await auto_processor.add_folder_to_monitor(folder_id, position_name)
+        return {"status": "success", "message": f"Added {position_name} to auto-processing"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/auto-process/remove-folder")
+def remove_folder_from_auto_process(folder_id: str = Body(...)):
+    """Remove a folder from automatic processing monitoring."""
+    auto_processor.remove_folder_from_monitor(folder_id)
+    return {"status": "success", "message": "Folder removed from auto-processing"}
+
+@app.get("/auto-process/status")
+def get_auto_process_status():
+    """Get current auto-processing status."""
+    return auto_processor.get_status() 

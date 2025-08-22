@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV Review System - Webhook Management</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="main-title">
+                    <i class="fas fa-robot"></i>
+                    CV Review System - Auto-Processing Setup
+                </h1>
+                <p class="subtitle">Configure automatic CV review when files are uploaded to Google Drive</p>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Webhook Status Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-broadcast-tower"></i> Webhook Status</h2>
+                    <button id="refreshStatusBtn" class="btn btn-secondary">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="webhookStatus" class="status-container">
+                        <div class="loading-container">
+                            <div class="spinner"></div>
+                            <div class="loading-text">Loading webhook status...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Setup New Webhook Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-plus-circle"></i> Setup Auto-Processing</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="positionSelect">
+                            <i class="fas fa-briefcase"></i>
+                            Select Position to Auto-Monitor:
+                        </label>
+                        <select id="positionSelect" class="form-control">
+                            <option value="">Loading positions...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cvFolderId">
+                            <i class="fas fa-folder"></i>
+                            CV Folder ID:
+                        </label>
+                        <input type="text" id="cvFolderId" class="form-control" readonly 
+                               placeholder="Select a position first">
+                    </div>
+
+                    <div class="form-group">
+                        <button id="setupWebhookBtn" class="btn btn-primary" disabled>
+                            <i class="fas fa-rocket"></i>
+                            Enable Auto-Processing
+                        </button>
+                    </div>
+
+                    <div id="setupResult" class="status-message" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Instructions Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-info-circle"></i> How Auto-Processing Works</h2>
+                </div>
+                <div class="card-body">
+                    <div class="instructions">
+                        <div class="instruction-item">
+                            <div class="instruction-icon">
+                                <i class="fas fa-upload"></i>
+                            </div>
+                            <div class="instruction-content">
+                                <h3>1. Upload Detection</h3>
+                                <p>When a CV file (PDF/DOCX) is uploaded to a monitored Google Drive folder, our system is immediately notified.</p>
+                            </div>
+                        </div>
+
+                        <div class="instruction-item">
+                            <div class="instruction-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="instruction-content">
+                                <h3>2. AI Analysis</h3>
+                                <p>The AI agents automatically analyze the CV against the job description and provide a detailed review with fit score.</p>
+                            </div>
+                        </div>
+
+                        <div class="instruction-item">
+                            <div class="instruction-icon">
+                                <i class="fas fa-filter"></i>
+                            </div>
+                            <div class="instruction-content">
+                                <h3>3. Auto-Qualification</h3>
+                                <p>CVs scoring above 80% are automatically moved to the "qualified_cv_list" folder for your review.</p>
+                            </div>
+                        </div>
+
+                        <div class="instruction-item">
+                            <div class="instruction-icon">
+                                <i class="fas fa-bell"></i>
+                            </div>
+                            <div class="instruction-content">
+                                <h3>4. Notifications</h3>
+                                <p>You'll receive notifications about processed CVs and their qualification status.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Requirements -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-cog"></i> Configuration Requirements</h2>
+                </div>
+                <div class="card-body">
+                    <div class="requirements">
+                        <div class="requirement-item">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>Your backend must be publicly accessible (use ngrok for local development)</span>
+                        </div>
+                        <div class="requirement-item">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>WEBHOOK_BASE_URL environment variable must be set</span>
+                        </div>
+                        <div class="requirement-item">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>Google Drive API credentials with proper permissions</span>
+                        </div>
+                        <div class="requirement-item">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span>Folder structure: position_folder/cv_list/ and position_folder/job_description/</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="webhook-manager.js"></script>
+</body>
+</html>
