@@ -1,10 +1,12 @@
 // filepath: /Users/nfqlocal/cv_review_system/frontend/main.js
 let currentCVs = [];
 let qualifiedFolderId = '';
+let unqualifiedFolderId = '';
 let reviewAllAbortController = null;
 let CV_LIST_FOLDER_NAME = 'cv_list';
 let JOB_DESCRIPTIONS_FOLDER_NAME = 'job_description';
 let QUALIFICATIONS_CV_LIST_FOLDER_NAME = 'qualified_cv_list';
+let UNQUALIFICATIONS_CV_LIST_FOLDER_NAME = 'unqualified_cv_list';
 
 // Load folders from Google Drive
 async function loadGDriveFolders() {
@@ -228,7 +230,12 @@ async function reviewAllCVs() {
     const res = await fetch(`http://localhost:8000/review_all`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_description: jobDescription, cvs: currentCVs, qualified_folder_id: qualifiedFolderId }),
+      body: JSON.stringify({ 
+        job_description: jobDescription, 
+        cvs: currentCVs, 
+        qualified_folder_id: qualifiedFolderId,
+        unqualified_folder_id: unqualifiedFolderId 
+      }),
       signal: reviewAllAbortController.signal
     });
 
@@ -484,6 +491,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const cvFolderId = folders.find(folder => folder.name === CV_LIST_FOLDER_NAME)?.id || '';
         const jobDescFolderId = folders.find(folder => folder.name === JOB_DESCRIPTIONS_FOLDER_NAME)?.id || '';
         qualifiedFolderId = folders.find(folder => folder.name === QUALIFICATIONS_CV_LIST_FOLDER_NAME)?.id || '';
+        unqualifiedFolderId = folders.find(folder => folder.name === UNQUALIFICATIONS_CV_LIST_FOLDER_NAME)?.id || '';
         // Load CVs and job description concurrently
         await Promise.all([
           loadJobDescription(jobDescFolderId),

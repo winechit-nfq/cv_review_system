@@ -163,6 +163,57 @@ def move_to_qualified_folder(file_id: str, qualified_folder_id: str) -> bool:
         print(f"[ERROR] Failed to move file {file_id} to qualified folder: {str(e)}")
         return False
 
+def move_to_unqualified_folder(file_id: str, unqualified_folder_id: str) -> bool:
+    """Move the file to the unqualified candidates folder in Google Drive."""
+    try:
+        creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+        
+        if not creds_json or not unqualified_folder_id:
+            print("[ERROR] Google Drive credentials or unqualified folder ID not set")
+            return False
+            
+        if creds_json.strip().startswith('{'):
+            creds_dict = json.loads(creds_json)
+        else:
+            with open(creds_json) as f:
+                creds_dict = json.load(f)
+                
+        creds = service_account.Credentials.from_service_account_info(
+            creds_dict, 
+            scopes=["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+        )
+        service = build('drive', 'v3', credentials=creds)
+        
+        try:
+            # Get current file metadata including parents
+            file = service.files().get(
+                fileId=file_id,
+                fields='parents,name'
+            ).execute()
+            
+            # Remove the file from its current folder
+            previous_parents = ",".join(file.get('parents', []))
+            
+            # Move the file to the unqualified folder
+            updated_file = service.files().update(
+                fileId=file_id,
+                addParents=unqualified_folder_id,
+                removeParents=previous_parents,
+                fields='id, parents, name'
+            ).execute()
+            
+            print(f"[INFO] Successfully moved file {file.get('name')} to unqualified folder")
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Error accessing file {file_id}: {str(e)}")
+            return False
+        
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to move file {file_id} to unqualified folder: {str(e)}")
+        return False
+
 def get_gdrive_cv_content(file_id):
     creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
     import json
@@ -267,7 +318,8 @@ def review_cv(cv: CVInfo):
 async def review_all_cvs(
     cvs: List[CVInfo],
     job_description: Optional[str] = Body(None),
-    qualified_folder_id: Optional[str] = Body(None)
+    qualified_folder_id: Optional[str] = Body(None),
+    unqualified_folder_id: Optional[str] = Body(None)
 ):
 
     # Create a single ThreadPoolExecutor for all tasks
@@ -335,25 +387,51 @@ async def review_all_cvs(
             # Debug logging
             print(f"[DEBUG] {cv.name} Fit Score: {fit_score}")
             
-            # Step 5: Move qualified CVs to the qualified folder
+            # Step 5: Move qualified/unqualified CVs to respective folders
             moved_to_qualified = False
-            if fit_score > 80 and cv.source == 'gdrive':
-                try:
-                    moved_to_qualified = await loop.run_in_executor(
-                        executor,
-                        move_to_qualified_folder,
-                        cv.path,
-                        qualified_folder_id
-                    )
-                    if moved_to_qualified:
-                        print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
-                except Exception as e:
-                    print(f"[ERROR] Failed to move CV {cv.name} to qualified folder: {str(e)}")
-                    # Continue processing even if move fails
+            moved_to_unqualified = False
+            
+            if cv.source == 'gdrive':
+                if fit_score > 80 and qualified_folder_id:
+                    # Move qualified CVs (score > 80) to qualified folder
+                    try:
+                        moved_to_qualified = await loop.run_in_executor(
+                            executor,
+                            move_to_qualified_folder,
+                            cv.path,
+                            qualified_folder_id
+                        )
+                        if moved_to_qualified:
+                            print(f"[INFO] Moved qualified CV {cv.name} to qualified folder")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to move CV {cv.name} to qualified folder: {str(e)}")
+                        # Continue processing even if move fails
+                        
+                elif fit_score <= 80 and unqualified_folder_id:
+                    # Move unqualified CVs (score <= 80) to unqualified folder
+                    try:
+                        moved_to_unqualified = await loop.run_in_executor(
+                            executor,
+                            move_to_unqualified_folder,
+                            cv.path,
+                            unqualified_folder_id
+                        )
+                        if moved_to_unqualified:
+                            print(f"[INFO] Moved unqualified CV {cv.name} to unqualified folder")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to move CV {cv.name} to unqualified folder: {str(e)}")
+                        # Continue processing even if move fails
+
+            # Prepare move status message
+            move_status = ""
+            if moved_to_qualified:
+                move_status = "[Moved to qualified folder]"
+            elif moved_to_unqualified:
+                move_status = "[Moved to unqualified folder]"
 
             return ReviewAllResult(
                 cv_name=cv.name,
-                review=f"{review}\n\n{'[Moved to qualified folder]' if moved_to_qualified else ''}",
+                review=f"{review}\n\n{move_status}" if move_status else review,
                 fit_score=fit_score,
                 token_count=token_count,
                 prompt_tokens=prompt_tokens,
