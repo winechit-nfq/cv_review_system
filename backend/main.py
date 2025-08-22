@@ -16,6 +16,11 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import io
 from pdfminer.high_level import extract_text
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -26,6 +31,88 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Google Drive configuration
+GOOGLE_DRIVE_SCOPES = [
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive"
+]
+
+def get_google_drive_credentials():
+    """
+    Get Google Drive credentials from environment variable or file.
+    Returns service account credentials object.
+    
+    Raises:
+        ValueError: If credentials are not found or invalid
+        FileNotFoundError: If credentials file is specified but not found
+        json.JSONDecodeError: If credentials JSON is malformed
+    """
+    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+    
+    if not creds_json:
+        # Try to load from default file location
+        default_creds_file = "google_drive_credentials.json"
+        if os.path.exists(default_creds_file):
+            logger.info(f"Loading Google Drive credentials from {default_creds_file}")
+            with open(default_creds_file, 'r') as f:
+                creds_dict = json.load(f)
+        else:
+            raise ValueError(
+                "Google Drive credentials not found. Set GOOGLE_DRIVE_CREDENTIALS environment variable "
+                "or place credentials in google_drive_credentials.json file."
+            )
+    else:
+        # Parse credentials from environment variable
+        if creds_json.strip().startswith('{'):
+            # Direct JSON string
+            try:
+                creds_dict = json.loads(creds_json)
+                logger.info("Loaded Google Drive credentials from environment variable (JSON string)")
+            except json.JSONDecodeError as e:
+                raise json.JSONDecodeError(f"Invalid JSON in GOOGLE_DRIVE_CREDENTIALS: {e}")
+        else:
+            # File path
+            if not os.path.exists(creds_json):
+                raise FileNotFoundError(f"Google Drive credentials file not found: {creds_json}")
+            logger.info(f"Loading Google Drive credentials from file: {creds_json}")
+            with open(creds_json, 'r') as f:
+                creds_dict = json.load(f)
+    
+    # Validate required fields in service account credentials
+    required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
+    missing_fields = [field for field in required_fields if field not in creds_dict]
+    if missing_fields:
+        raise ValueError(f"Missing required fields in Google Drive credentials: {missing_fields}")
+    
+    if creds_dict.get('type') != 'service_account':
+        raise ValueError("Google Drive credentials must be for a service account")
+    
+    return service_account.Credentials.from_service_account_info(
+        creds_dict, 
+        scopes=GOOGLE_DRIVE_SCOPES
+    )
+
+def get_google_drive_service():
+    """
+    Get authenticated Google Drive service instance.
+    
+    Returns:
+        googleapiclient.discovery.Resource: Authenticated Drive service
+        
+    Raises:
+        ValueError: If credentials are invalid
+        Exception: If service creation fails
+    """
+    try:
+        credentials = get_google_drive_credentials()
+        service = build('drive', 'v3', credentials=credentials)
+        logger.info("Successfully created Google Drive service")
+        return service
+    except Exception as e:
+        logger.error(f"Failed to create Google Drive service: {e}")
+        raise
 
 # Placeholder for CV metadata
 class CVInfo(BaseModel):
@@ -49,53 +136,71 @@ class ReviewAllResult(BaseModel):
     total_tokens: Optional[int] = 0
 
 def list_gdrive_folders(parent_id: str = None):
-    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    root_folder_id = parent_id if parent_id is not None else os.getenv("GOOGLE_DRIVE_FOLDER_ID")
-    if not creds_json or not root_folder_id:
-        return []
+    """
+    List folders in Google Drive.
     
-    if creds_json.strip().startswith('{'):
-        creds_dict = json.loads(creds_json)
-    else:
-        with open(creds_json) as f:
-            creds_dict = json.load(f)
-    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
-    service = build('drive', 'v3', credentials=creds)
-
+    Args:
+        parent_id: Parent folder ID. If None, uses GOOGLE_DRIVE_FOLDER_ID from environment
+        
+    Returns:
+        List of folder dictionaries with 'id' and 'name' keys
+    """
     try:
+        root_folder_id = parent_id if parent_id is not None else os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+        if not root_folder_id:
+            logger.warning("No Google Drive folder ID provided")
+            return []
+        
+        service = get_google_drive_service()
+        
         # Query for folders within the root folder
         results = service.files().list(
             q=f"'{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
             fields="files(id, name)",
             pageSize=50
         ).execute()
+        
         folders = results.get('files', [])
+        logger.info(f"Found {len(folders)} folders in {root_folder_id}")
         return [{"id": folder["id"], "name": folder["name"]} for folder in folders]
+        
     except Exception as e:
-        print(f"Error listing folders: {e}")
+        logger.error(f"Error listing Google Drive folders: {e}")
         return []
 
 def list_gdrive_cvs(folder_id=None):
-    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    if not folder_id:
-        folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
-    if not creds_json or not folder_id:
-        return []
+    """
+    List CV files (PDF and DOCX) in a Google Drive folder.
     
-    if creds_json.strip().startswith('{'):
-        creds_dict = json.loads(creds_json)
-    else:
-        with open(creds_json) as f:
-            creds_dict = json.load(f)
-    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
-    service = build('drive', 'v3', credentials=creds)
-    results = service.files().list(
-        q=f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document') and trashed=false",
-        fields="files(id, name)",
-        pageSize=50
-    ).execute()
-    files = results.get('files', [])
-    return [CVInfo(name=f["name"], source="gdrive", path=f["id"]) for f in files]
+    Args:
+        folder_id: Folder ID to search in. If None, uses GOOGLE_DRIVE_FOLDER_ID from environment
+        
+    Returns:
+        List of CVInfo objects
+    """
+    try:
+        if not folder_id:
+            folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+        
+        if not folder_id:
+            logger.warning("No Google Drive folder ID provided for CV listing")
+            return []
+        
+        service = get_google_drive_service()
+        
+        results = service.files().list(
+            q=f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document') and trashed=false",
+            fields="files(id, name)",
+            pageSize=50
+        ).execute()
+        
+        files = results.get('files', [])
+        logger.info(f"Found {len(files)} CV files in folder {folder_id}")
+        return [CVInfo(name=f["name"], source="gdrive", path=f["id"]) for f in files]
+        
+    except Exception as e:
+        logger.error(f"Error listing CV files from Google Drive: {e}")
+        return []
 
 def list_github_cvs():
     token = os.getenv("GITHUB_TK")
@@ -114,131 +219,110 @@ def list_github_cvs():
 
 def move_to_qualified_folder(file_id: str, qualified_folder_id: str) -> bool:
     """Move the file to the qualified candidates folder in Google Drive."""
+    if not qualified_folder_id:
+        logger.error("No qualified folder ID provided")
+        return False
+        
     try:
-        creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+        service = get_google_drive_service()
         
-        if not creds_json or not qualified_folder_id:
-            print("[ERROR] Google Drive credentials or qualified folder ID not set")
-            return False
-            
-        if creds_json.strip().startswith('{'):
-            creds_dict = json.loads(creds_json)
-        else:
-            with open(creds_json) as f:
-                creds_dict = json.load(f)
-                
-        creds = service_account.Credentials.from_service_account_info(
-            creds_dict, 
-            scopes=["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-        )
-        service = build('drive', 'v3', credentials=creds)
+        # Get current file metadata including parents
+        file = service.files().get(
+            fileId=file_id,
+            fields='parents,name'
+        ).execute()
         
-        try:
-            # Get current file metadata including parents
-            file = service.files().get(
-                fileId=file_id,
-                fields='parents,name'
-            ).execute()
-            
-            # Remove the file from its current folder
-            previous_parents = ",".join(file.get('parents', []))
-            
-            # Move the file to the qualified folder
-            updated_file = service.files().update(
-                fileId=file_id,
-                addParents=qualified_folder_id,
-                removeParents=previous_parents,
-                fields='id, parents, name'
-            ).execute()
-            
-            print(f"[INFO] Successfully moved file {file.get('name')} to qualified folder")
-            return True
-            
-        except Exception as e:
-            print(f"[ERROR] Error accessing file {file_id}: {str(e)}")
-            return False
+        # Remove the file from its current folder
+        previous_parents = ",".join(file.get('parents', []))
         
+        # Move the file to the qualified folder
+        updated_file = service.files().update(
+            fileId=file_id,
+            addParents=qualified_folder_id,
+            removeParents=previous_parents,
+            fields='id, parents, name'
+        ).execute()
+        
+        logger.info(f"Successfully moved file '{file.get('name')}' to qualified folder")
         return True
+        
     except Exception as e:
-        print(f"[ERROR] Failed to move file {file_id} to qualified folder: {str(e)}")
+        logger.error(f"Failed to move file {file_id} to qualified folder: {e}")
         return False
 
 def move_to_unqualified_folder(file_id: str, unqualified_folder_id: str) -> bool:
     """Move the file to the unqualified candidates folder in Google Drive."""
+    if not unqualified_folder_id:
+        logger.error("No unqualified folder ID provided")
+        return False
+        
     try:
-        creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
+        service = get_google_drive_service()
         
-        if not creds_json or not unqualified_folder_id:
-            print("[ERROR] Google Drive credentials or unqualified folder ID not set")
-            return False
-            
-        if creds_json.strip().startswith('{'):
-            creds_dict = json.loads(creds_json)
-        else:
-            with open(creds_json) as f:
-                creds_dict = json.load(f)
-                
-        creds = service_account.Credentials.from_service_account_info(
-            creds_dict, 
-            scopes=["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-        )
-        service = build('drive', 'v3', credentials=creds)
+        # Get current file metadata including parents
+        file = service.files().get(
+            fileId=file_id,
+            fields='parents,name'
+        ).execute()
         
-        try:
-            # Get current file metadata including parents
-            file = service.files().get(
-                fileId=file_id,
-                fields='parents,name'
-            ).execute()
-            
-            # Remove the file from its current folder
-            previous_parents = ",".join(file.get('parents', []))
-            
-            # Move the file to the unqualified folder
-            updated_file = service.files().update(
-                fileId=file_id,
-                addParents=unqualified_folder_id,
-                removeParents=previous_parents,
-                fields='id, parents, name'
-            ).execute()
-            
-            print(f"[INFO] Successfully moved file {file.get('name')} to unqualified folder")
-            return True
-            
-        except Exception as e:
-            print(f"[ERROR] Error accessing file {file_id}: {str(e)}")
-            return False
+        # Remove the file from its current folder
+        previous_parents = ",".join(file.get('parents', []))
         
+        # Move the file to the unqualified folder
+        updated_file = service.files().update(
+            fileId=file_id,
+            addParents=unqualified_folder_id,
+            removeParents=previous_parents,
+            fields='id, parents, name'
+        ).execute()
+        
+        logger.info(f"Successfully moved file '{file.get('name')}' to unqualified folder")
         return True
+        
     except Exception as e:
-        print(f"[ERROR] Failed to move file {file_id} to unqualified folder: {str(e)}")
+        logger.error(f"Failed to move file {file_id} to unqualified folder: {e}")
         return False
 
 def get_gdrive_cv_content(file_id):
-    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    import json
-    if creds_json.strip().startswith('{'):
-        creds_dict = json.loads(creds_json)
-    else:
-        with open(creds_json) as f:
-            creds_dict = json.load(f)
-    creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
-    service = build('drive', 'v3', credentials=creds)
-    file = service.files().get(fileId=file_id, fields="name, mimeType").execute()
-    mime = file['mimeType']
-    if mime == 'application/pdf':
-        data = service.files().get_media(fileId=file_id).execute()
-        import io
-        from pdfminer.high_level import extract_text
-        text = extract_text(io.BytesIO(data))
-        return text
-    elif mime == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-        data = service.files().get_media(fileId=file_id).execute()
-        import io
-        from docx import Document
-        doc = Document(io.BytesIO(data))
-        return '\n'.join([p.text for p in doc.paragraphs])
-    return "Unsupported file type"
+    """
+    Extract text content from a Google Drive file (PDF or DOCX).
+    
+    Args:
+        file_id: Google Drive file ID
+        
+    Returns:
+        str: Extracted text content
+    """
+    try:
+        service = get_google_drive_service()
+        
+        # Get file metadata
+        file = service.files().get(fileId=file_id, fields="name, mimeType").execute()
+        mime_type = file['mimeType']
+        file_name = file.get('name', 'Unknown')
+        
+        logger.info(f"Extracting content from file: {file_name} (type: {mime_type})")
+        
+        if mime_type == 'application/pdf':
+            # Handle PDF files
+            data = service.files().get_media(fileId=file_id).execute()
+            text = extract_text(io.BytesIO(data))
+            return text
+            
+        elif mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            # Handle DOCX files
+            data = service.files().get_media(fileId=file_id).execute()
+            from docx import Document
+            doc = Document(io.BytesIO(data))
+            return '\n'.join([p.text for p in doc.paragraphs])
+            
+        else:
+            logger.warning(f"Unsupported file type: {mime_type} for file {file_name}")
+            return f"Unsupported file type: {mime_type}"
+            
+    except Exception as e:
+        logger.error(f"Error extracting content from Google Drive file {file_id}: {e}")
+        return f"Error reading file: {str(e)}"
 
 def get_github_cv_content(path):
     token = os.getenv("GITHUB_TK")
@@ -591,46 +675,35 @@ def get_file_content(service, file_id):
 
 def get_job_description_from_drive(folder_id=None):
     """Get job description from a file in Google Drive."""
-    creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-    if not creds_json:
-        return "No Google Drive credentials configured"
+    if not folder_id:
+        logger.warning("No folder ID provided for job description")
+        return "No folder ID provided. No job description file found in the selected folder."
     
-    if creds_json.strip().startswith('{'):
-        creds_dict = json.loads(creds_json)
-    else:
-        with open(creds_json) as f:
-            creds_dict = json.load(f)
-            
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict, 
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    service = build('drive', 'v3', credentials=creds)
-
     try:
-        if folder_id:
+        service = get_google_drive_service()
         
-            results = service.files().list(
-                q=f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document') and trashed=false",
-                fields="files(id, name, mimeType)",
-                pageSize=1,  # We only need the first matching file
-                orderBy="createdTime desc"  # Get the most recent file if multiple exist
-            ).execute()
+        results = service.files().list(
+            q=f"'{folder_id}' in parents and (mimeType='application/pdf' or mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document') and trashed=false",
+            fields="files(id, name, mimeType)",
+            pageSize=1,  # We only need the first matching file
+            orderBy="createdTime desc"  # Get the most recent file if multiple exist
+        ).execute()
 
-            files = results.get('files', [])
-            if not files:
-                return "No job description file found in the selected folder"
+        files = results.get('files', [])
+        if not files:
+            logger.warning(f"No job description file found in folder {folder_id}")
+            return "No job description file found in the selected folder"
 
-            # Use the first matching file
-            file_id = files[0]['id']
-            print(f"[INFO] Found job description file: {files[0]['name']}")
-            return get_file_content(service, file_id)
-        else:
-            return 'No folder ID provided. No job description file found in the selected folder.'
+        # Use the first matching file
+        file_id = files[0]['id']
+        file_name = files[0]['name']
+        logger.info(f"Found job description file: {file_name}")
+        
+        return get_file_content(service, file_id)
 
     except Exception as e:
         error_msg = f"Error reading job description: {str(e)}"
-        print(f"[ERROR] {error_msg}")
+        logger.error(error_msg)
         return error_msg
 
 @app.get("/job_description", response_class=PlainTextResponse)
