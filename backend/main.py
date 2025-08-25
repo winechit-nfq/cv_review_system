@@ -18,6 +18,12 @@ import io
 from pdfminer.high_level import extract_text
 from datetime import datetime
 
+# Constants for folder names
+CV_LIST_FOLDER_NAME = 'cv_list'
+JOB_DESCRIPTIONS_FOLDER_NAME = 'job_description'
+QUALIFICATIONS_CV_LIST_FOLDER_NAME = 'qualified_cv_list'
+UNQUALIFICATIONS_CV_LIST_FOLDER_NAME = 'unqualified_cv_list'
+
 app = FastAPI()
 
 app.add_middleware(
@@ -75,6 +81,10 @@ def list_gdrive_folders(parent_id: str = None):
     except Exception as e:
         print(f"Error listing folders: {e}")
         return []
+
+def fetchGDriveFolders(parent_id: str = None):
+    """Helper function that mimics the frontend fetchGDriveFolders function"""
+    return list_gdrive_folders(parent_id)
 
 def list_gdrive_cvs(folder_id=None):
     creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
@@ -600,44 +610,36 @@ async def handle_drive_webhook(request: Request):
 
         print(f"[INFO] Drive webhook: type={event_type} file_id={file_id} name={file_name} folder_id={folder_id}")
 
-        # Resolve folder_id from file parents if missing
-        if not folder_id and file_id:
-            creds_json = os.getenv("GOOGLE_DRIVE_CREDENTIALS")
-            if not creds_json:
-                return PlainTextResponse(content="Missing GOOGLE_DRIVE_CREDENTIALS", status_code=500)
-            if creds_json.strip().startswith('{'):
-                creds_dict = json.loads(creds_json)
-            else:
-                with open(creds_json) as f:
-                    creds_dict = json.load(f)
-            creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=["https://www.googleapis.com/auth/drive"])
-            service = build('drive', 'v3', credentials=creds)
-            meta = service.files().get(fileId=file_id, fields='parents').execute()
-            parents = meta.get('parents', [])
-            folder_id = parents[0] if parents else os.getenv("GOOGLE_DRIVE_FOLDER_ID")
-
         if not folder_id:
             return PlainTextResponse(content="No folder_id resolved", status_code=400)
+
+        # Get subfolders and find relevant folder IDs
+        folders = fetchGDriveFolders(folder_id)
+
+        # Find relevant subfolder IDs
+        cv_folder_id = next((folder['id'] for folder in folders if folder['name'] == CV_LIST_FOLDER_NAME), '')
+        job_desc_folder_id = next((folder['id'] for folder in folders if folder['name'] == JOB_DESCRIPTIONS_FOLDER_NAME), '')
+        qualified_folder_id = next((folder['id'] for folder in folders if folder['name'] == QUALIFICATIONS_CV_LIST_FOLDER_NAME), '')
+        unqualified_folder_id = next((folder['id'] for folder in folders if folder['name'] == UNQUALIFICATIONS_CV_LIST_FOLDER_NAME), '')
 
         # Ensure default envs for subsequent helpers
         if os.getenv("GOOGLE_DRIVE_FOLDER_ID") != folder_id:
             os.environ["GOOGLE_DRIVE_FOLDER_ID"] = folder_id
 
         # Load job description from same folder
-        job_description_text = get_job_description_from_drive(folder_id)
+        job_description_text = get_job_description_from_drive(job_desc_folder_id)
 
         # List CVs in the folder
-        cvs_to_review = list_gdrive_cvs(folder_id)
+        cvs_to_review = list_gdrive_cvs(cv_folder_id)
         if not cvs_to_review:
             return PlainTextResponse(content="No CVs found to process.", status_code=200)
 
         # Run review for all CVs
-        qualified_folder_id = os.getenv("GOOGLE_DRIVE_QUALIFIED_FOLDER_ID")
         results = await review_all_cvs(
             cvs_to_review,
             job_description=job_description_text,
             qualified_folder_id=qualified_folder_id,
-            unqualified_folder_id=os.getenv("GOOGLE_DRIVE_UNQUALIFIED_FOLDER_ID")
+            unqualified_folder_id=unqualified_folder_id
         )
 
         # Serialize results to JSON-safe structures
